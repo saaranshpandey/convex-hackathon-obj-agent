@@ -1,0 +1,52 @@
+import { useState } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+
+export default function EbayConnectButton({ sessionId }: { sessionId: string }) {
+  const status = useQuery(api.ebayAuth.connectionStatus, { sessionId });
+  const connect = useMutation(api.ebayAuth.connect);
+  const disconnect = useMutation(api.ebayAuth.disconnect);
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (status === undefined) return null;
+
+  if (status.connected) {
+    return (
+      <button
+        onClick={() => void disconnect({ sessionId })}
+        title="Disconnect eBay"
+        className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-ink-soft ring-1 ring-line ring-inset transition-colors hover:bg-canvas"
+      >
+        <span className="size-1.5 rounded-full bg-accent-deep" />
+        eBay ✓ Connected
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {error && <span className="text-xs text-muted">{error}</span>}
+      <button
+        onClick={async () => {
+          setConnecting(true);
+          setError(null);
+          try {
+            const result = await connect({ sessionId });
+            if (result.authorizeUrl) {
+              window.open(result.authorizeUrl, "ebay-oauth", "width=500,height=700");
+            }
+          } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Couldn't connect eBay.");
+          } finally {
+            setConnecting(false);
+          }
+        }}
+        disabled={connecting}
+        className="rounded-full px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
+      >
+        {connecting ? "Connecting…" : "Connect eBay"}
+      </button>
+    </div>
+  );
+}

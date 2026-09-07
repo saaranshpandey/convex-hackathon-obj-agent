@@ -1,12 +1,14 @@
 import { RotateCcw, Scan } from "lucide-react";
+import EbayConnectButton from "@/components/EbayConnectButton";
 
 type Props = {
   onHome: () => void;
   /** Provided only in development — wipes this session's Convex data. */
   onReset?: () => void;
+  sessionId: string;
 };
 
-export default function TopNav({ onHome, onReset }: Props) {
+export default function TopNav({ onHome, onReset, sessionId }: Props) {
   return (
     <header className="sticky top-0 z-30 bg-canvas/85 backdrop-blur-sm">
       <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between px-6 sm:px-8">
@@ -33,6 +35,7 @@ export default function TopNav({ onHome, onReset }: Props) {
               Reset demo data
             </button>
           )}
+          <EbayConnectButton sessionId={sessionId} />
           <span className="hidden cursor-default rounded-full px-3.5 py-1.5 text-sm text-muted sm:inline">
             Sales
           </span>

@@ -156,6 +156,7 @@ export default function App() {
           setComposingNew(true);
         }}
         onReset={import.meta.env.DEV ? handleReset : undefined}
+        sessionId={sessionId}
       />
 
       <main className="mx-auto w-full max-w-[1600px] px-6 pb-16 sm:px-8">
