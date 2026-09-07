@@ -12,7 +12,7 @@
 - **Auth:** none
 - **AI models:** gpt-5.6-luna, fal-ai/sam2/image
 - **Started:** 2026-09-07T05:06:14Z
-- **Last updated:** 2026-09-07T22:34:36Z
+- **Last updated:** 2026-09-07T23:56:34Z
 
 ## Log
 
@@ -101,3 +101,25 @@ rather than a guess. Each listing's drawer gained an Agent tab that reads as a
 conversation instead of raw email. Convex features: HTTP actions, scheduled
 functions, actions, mutations, queries, indexes (`convex/agentMail.ts`,
 `convex/agentMail/`, `convex/http.ts`, `src/components/AgentTab.tsx`).
+
+### 2026-09-07 - 9d9cb2c
+Added Phase 8: marketplace offers behind a provider adapter, so the buy/sell
+negotiation works identically whether the offer is simulated or real. An offer
+enters through one idempotent ingest keyed on the marketplace's own offer id,
+sets the listing's pending decision, and emails the owner. Accepting, declining
+and countering all run through a single decision path that the web UI buttons
+and an emailed reply both call — there is no second approval route. The outcome
+is claimed inside a transaction before the marketplace call, so a double click
+loses the race, and a failed call reverts rather than leaving the listing wrong.
+Each decision is bound to a specific offer carried on the email thread, so
+replying to an older notice can never settle a newer offer, and completing a
+sale closes out that item's other open offers the way a marketplace does.
+Buyer-initiated Best Offers are Trading-API-only (the REST Sell APIs don't
+expose them, and the REST Negotiation API is the opposite direction), so the
+real adapter speaks XML; its transport is unverified without eBay credentials,
+but its request building and response normalisation are covered by 14 fixture
+tests. Demo simulators are gated on a server-side DEMO_MODE rather than hidden
+in the client. Convex features: schema, indexes, queries, mutations, actions,
+internal functions, scheduled functions (`convex/marketplace/`,
+`convex/offers.ts`, `convex/agentMail.ts`, `tests/marketplace/ebayXml.test.ts`,
+`src/components/OfferCard.tsx`).
