@@ -32,6 +32,7 @@ type Env = {
   readonly CONVEX_SITE_URL: string;
   readonly FAL_KEY: string | undefined;
   readonly FAL_MASK_MODEL: string | undefined;
+  readonly FIRECRAWL_API_KEY: string | undefined;
   readonly MASK_MODE: string | undefined;
   readonly OPENAI_API_KEY: string | undefined;
   readonly OPENAI_REASONING_EFFORT: string | undefined;
