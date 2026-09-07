@@ -34,6 +34,39 @@ export const maskStatus = v.union(
   v.literal("failed"),
 );
 
+export const researchStatus = v.union(
+  v.literal("queued"),
+  v.literal("identifying"),
+  v.literal("researching"),
+  v.literal("ready_for_review"),
+  v.literal("failed"),
+);
+
+export const identificationConfidence = v.union(
+  v.literal("low"),
+  v.literal("medium"),
+  v.literal("high"),
+);
+
+export const identificationValidator = v.object({
+  genericName: v.string(),
+  // Always present but nullable, matching OpenAI's strict-schema output
+  // (identify.ts's IdentificationResult) — never absent/undefined.
+  brand: v.union(v.string(), v.null()),
+  model: v.union(v.string(), v.null()),
+  category: v.string(),
+  condition: v.string(),
+  attributes: v.array(v.string()),
+  confidence: identificationConfidence,
+});
+
+export const researchSourceValidator = v.object({
+  source: v.string(),
+  price: v.string(),
+  description: v.string(),
+  url: v.string(),
+});
+
 export const activityType = v.union(
   v.literal("cleanout_created"),
   v.literal("detection_started"),
@@ -46,6 +79,9 @@ export const activityType = v.union(
   v.literal("item_added"),
   v.literal("item_removed"),
   v.literal("selection_bulk"),
+  v.literal("research_started"),
+  v.literal("research_completed"),
+  v.literal("research_failed"),
 );
 
 export default defineSchema({
@@ -88,6 +124,14 @@ export default defineSchema({
     maskError: v.optional(v.string()),
     maskLatencyMs: v.optional(v.number()),
     segmentationProvider: v.optional(v.string()),
+
+    // Phase 4: identification + resale research, independent per item.
+    researchStatus: v.optional(researchStatus),
+    researchError: v.optional(v.string()),
+    identification: v.optional(identificationValidator),
+    recommendedPrice: v.optional(v.number()),
+    pricingRationale: v.optional(v.string()),
+    researchSources: v.optional(v.array(researchSourceValidator)),
 
     estimatedLow: v.optional(v.number()),
     estimatedHigh: v.optional(v.number()),
