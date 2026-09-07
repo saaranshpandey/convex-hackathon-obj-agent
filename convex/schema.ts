@@ -67,6 +67,20 @@ export const researchSourceValidator = v.object({
   url: v.string(),
 });
 
+export const listingStatus = v.union(
+  v.literal("draft"),
+  v.literal("approved"),
+  v.literal("listed"),
+);
+
+export const listingCondition = v.union(
+  v.literal("new"),
+  v.literal("like_new"),
+  v.literal("good"),
+  v.literal("fair"),
+  v.literal("poor"),
+);
+
 export const activityType = v.union(
   v.literal("cleanout_created"),
   v.literal("detection_started"),
@@ -146,4 +160,21 @@ export default defineSchema({
     message: v.string(),
     createdAt: v.number(),
   }).index("by_cleanoutId_and_createdAt", ["cleanoutId", "createdAt"]),
+
+  listings: defineTable({
+    cleanoutId: v.id("cleanouts"),
+    itemId: v.id("items"),
+    /** Fixed to "ebay" for now — a later phase may add other marketplaces. */
+    marketplace: v.string(),
+    title: v.string(),
+    description: v.string(),
+    category: v.string(),
+    condition: listingCondition,
+    price: v.number(),
+    status: listingStatus,
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_cleanoutId", ["cleanoutId"])
+    .index("by_itemId", ["itemId"]),
 });
