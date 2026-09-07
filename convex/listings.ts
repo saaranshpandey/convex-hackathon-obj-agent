@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
-import { listingCondition, listingStatus } from "./schema";
+import { listingCondition } from "./schema";
 
 /** One listing per item — a fresh draft replaces whatever was there before. */
 export const saveDraft = internalMutation({

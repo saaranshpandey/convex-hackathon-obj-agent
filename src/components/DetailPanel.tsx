@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, Loader2, PackageOpen, Pencil, Trash2 } from "lucide-react";
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
 import type { WorkspaceItem } from "@/lib/geometry";
 import ObjectThumb from "@/components/ObjectThumb";
 import ActivityFeed from "@/components/ActivityFeed";
+import ReadyToSell from "@/components/ReadyToSell";
 import { cn } from "@/lib/utils";
 
 type Props = {
   cleanoutId: Id<"cleanouts">;
   imageUrl: string;
   items: WorkspaceItem[];
+  listings: Doc<"listings">[];
   activeId: Id<"items"> | null;
   provider?: string;
   onToggle: (id: Id<"items">) => void;
@@ -18,12 +20,14 @@ type Props = {
   onHover: (id: Id<"items"> | null) => void;
   onRename: (id: Id<"items">, name: string) => void;
   onRemove: (id: Id<"items">) => void;
+  onReviewListing: (listingId: Id<"listings">) => void;
 };
 
 export default function DetailPanel({
   cleanoutId,
   imageUrl,
   items,
+  listings,
   activeId,
   provider,
   onToggle,
@@ -31,6 +35,7 @@ export default function DetailPanel({
   onHover,
   onRename,
   onRemove,
+  onReviewListing,
 }: Props) {
   const active = items.find((item) => item._id === activeId) ?? null;
 
@@ -52,6 +57,22 @@ export default function DetailPanel({
               onRename={onRename}
               onRemove={onRemove}
               onBack={() => onActivate(null)}
+            />
+          </motion.div>
+        ) : listings.length > 0 ? (
+          <motion.div
+            key="ready-to-sell"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <ReadyToSell
+              imageUrl={imageUrl}
+              items={items}
+              listings={listings}
+              onReview={onReviewListing}
+              onHover={onHover}
             />
           </motion.div>
         ) : (
