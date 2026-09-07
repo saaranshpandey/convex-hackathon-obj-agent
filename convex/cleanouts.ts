@@ -162,6 +162,11 @@ export const latestForSession = query({
       })),
     );
 
-    return { cleanout, imageUrl, items: withMasks };
+    const listings = await ctx.db
+      .query("listings")
+      .withIndex("by_cleanoutId", (q) => q.eq("cleanoutId", cleanout._id))
+      .take(50);
+
+    return { cleanout, imageUrl, items: withMasks, listings };
   },
 });
