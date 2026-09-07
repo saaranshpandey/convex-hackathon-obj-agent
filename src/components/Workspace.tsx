@@ -19,6 +19,7 @@ type Props = {
   activeId: Id<"items"> | null;
   hoveredId: Id<"items"> | null;
   drawing: boolean;
+  sessionId: string;
   reviewingListingId: Id<"listings"> | null;
   onToggle: (id: Id<"items">) => void;
   onHover: (id: Id<"items"> | null) => void;
@@ -45,6 +46,7 @@ export default function Workspace({
   activeId,
   hoveredId,
   drawing,
+  sessionId,
   reviewingListingId,
   onToggle,
   onHover,
@@ -219,6 +221,7 @@ export default function Workspace({
 
       <ListingsBar
         cleanoutId={cleanout._id}
+        sessionId={sessionId}
         listings={listings}
         onReviewAll={() => {
           if (listings[0]) onReviewListing(listings[0]._id);
@@ -232,6 +235,7 @@ export default function Workspace({
             imageUrl={imageUrl}
             listing={activeListing}
             item={activeListingItem}
+            sessionId={sessionId}
             hasPrev={activeListingIndex > 0}
             hasNext={activeListingIndex < listings.length - 1}
             onNavigate={onNavigateListing}

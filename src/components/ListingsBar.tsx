@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 
 type Props = {
   cleanoutId: Id<"cleanouts">;
+  sessionId: string;
   listings: Doc<"listings">[];
   onReviewAll: () => void;
 };
 
-export default function ListingsBar({ cleanoutId, listings, onReviewAll }: Props) {
-  const listApproved = useMutation(api.listings.listApproved);
+export default function ListingsBar({ cleanoutId, sessionId, listings, onReviewAll }: Props) {
+  const publishApproved = useMutation(api.listingPublish.publishApproved);
   const approvedCount = listings.filter((listing) => listing.status === "approved").length;
 
   if (listings.length === 0) return null;
@@ -28,7 +29,7 @@ export default function ListingsBar({ cleanoutId, listings, onReviewAll }: Props
           variant="accent"
           size="sm"
           disabled={approvedCount === 0}
-          onClick={() => void listApproved({ cleanoutId })}
+          onClick={() => void publishApproved({ cleanoutId, sessionId })}
         >
           List approved items
         </Button>

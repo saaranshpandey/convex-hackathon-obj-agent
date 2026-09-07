@@ -198,6 +198,7 @@ export default function App() {
                 activeId={activeId}
                 hoveredId={hoveredId}
                 drawing={drawing}
+                sessionId={sessionId}
                 reviewingListingId={reviewingListingId}
                 onToggle={(itemId) => {
                   setActiveId(itemId);

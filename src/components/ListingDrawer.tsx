@@ -20,6 +20,7 @@ type Props = {
   imageUrl: string;
   listing: Doc<"listings">;
   item: WorkspaceItem;
+  sessionId: string;
   hasPrev: boolean;
   hasNext: boolean;
   onNavigate: (direction: "prev" | "next") => void;
@@ -30,6 +31,7 @@ export default function ListingDrawer({
   imageUrl,
   listing,
   item,
+  sessionId,
   hasPrev,
   hasNext,
   onNavigate,
@@ -37,6 +39,7 @@ export default function ListingDrawer({
 }: Props) {
   const updateListing = useMutation(api.listings.update);
   const approveListing = useMutation(api.listings.approve);
+  const publishListing = useMutation(api.listingPublish.publish);
 
   const [title, setTitle] = useState(listing.title);
   const [description, setDescription] = useState(listing.description);
@@ -205,22 +208,56 @@ export default function ListingDrawer({
           </div>
         </details>
 
-        <div className="mt-5 flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={() => void updateListing(draft())}
-          >
-            Save
-          </Button>
-          <Button
-            variant="accent"
-            className="flex-1"
-            onClick={() => void approveListing(draft())}
-          >
-            Approve listing
-          </Button>
-        </div>
+        {listing.status === "live" || listing.status === "sold" || listing.status === "ended" ? (
+          <div className="mt-5 border-t border-line pt-4">
+            <p className="text-sm text-ink-soft">{title}</p>
+            <p className="mt-1 text-sm text-muted">
+              ${listing.price} · {listing.condition.replace(/_/g, " ")}
+            </p>
+            {listing.ebayListingUrl && (
+              <a
+                href={listing.ebayListingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-block rounded-full bg-canvas px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-line"
+              >
+                View on eBay
+              </a>
+            )}
+          </div>
+        ) : listing.status === "failed" ? (
+          <div className="mt-5 border-t border-line pt-4">
+            <p className="text-sm text-muted">
+              {listing.publishError ?? "Publishing failed for an unknown reason."}
+            </p>
+            <Button
+              variant="accent"
+              className="mt-3 w-full"
+              onClick={() => void publishListing({ listingId: listing._id, sessionId })}
+            >
+              Retry publish
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-5 flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={listing.status === "publishing"}
+              onClick={() => void updateListing(draft())}
+            >
+              Save
+            </Button>
+            <Button
+              variant="accent"
+              className="flex-1"
+              disabled={listing.status === "publishing"}
+              onClick={() => void approveListing(draft())}
+            >
+              {listing.status === "publishing" ? "Publishing…" : "Approve listing"}
+            </Button>
+          </div>
+        )}
       </motion.aside>
     </>
   );
