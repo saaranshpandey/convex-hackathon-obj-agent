@@ -1,0 +1,5 @@
+fix UI - make it more compreshensive
+take buffer boundary pixels for product photos
+
+
+cache researched data
