@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, PackageOpen, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, Loader2, PackageOpen, Pencil, Trash2 } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { WorkspaceItem } from "@/lib/geometry";
 import ObjectThumb from "@/components/ObjectThumb";
@@ -249,14 +249,78 @@ function ItemDetail({
         )}
       </p>
 
+      {item.researchStatus &&
+        item.researchStatus !== "ready_for_review" &&
+        item.researchStatus !== "failed" && (
+          <p className="mt-4 flex items-center gap-2 border-t border-line pt-4 text-sm text-muted">
+            <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+            {item.researchStatus === "queued" && "Queued for resale research…"}
+            {item.researchStatus === "identifying" && "Identifying this item…"}
+            {item.researchStatus === "researching" && "Researching resale prices…"}
+          </p>
+        )}
+
+      {item.researchStatus === "failed" && (
+        <p className="mt-4 border-t border-line pt-4 text-sm text-muted">
+          Couldn't estimate resale value{item.researchError ? `: ${item.researchError}` : "."}
+        </p>
+      )}
+
+      {item.identification && (
+        <div className="mt-4 border-t border-line pt-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted">Identification confidence</span>
+            <span className="text-sm font-medium text-ink capitalize">
+              {item.identification.confidence}
+            </span>
+          </div>
+          {(item.identification.brand || item.identification.model) && (
+            <p className="mt-1 text-xs text-muted">
+              {[item.identification.brand, item.identification.model]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="mt-4 flex items-baseline justify-between border-t border-line pt-4">
-        <span className="text-sm text-muted">Estimated value</span>
+        <span className="text-sm text-muted">Estimated resale</span>
         <span className="text-sm font-medium text-muted">
           {item.estimatedLow !== undefined && item.estimatedHigh !== undefined
             ? `$${item.estimatedLow}–$${item.estimatedHigh}`
             : "—"}
         </span>
       </div>
+
+      {item.recommendedPrice !== undefined && (
+        <div className="flex items-baseline justify-between pt-1.5">
+          <span className="text-sm text-muted">Recommended</span>
+          <span className="text-sm font-semibold text-ink">
+            ${item.recommendedPrice}
+          </span>
+        </div>
+      )}
+
+      {item.researchSources && item.researchSources.length > 0 && (
+        <div className="mt-4 border-t border-line pt-4">
+          <p className="text-xs font-medium tracking-wide text-muted uppercase">
+            {item.researchSources.length} market{" "}
+            {item.researchSources.length === 1 ? "comparison" : "comparisons"}
+          </p>
+          <ul className="mt-2 space-y-2">
+            {item.researchSources.map((source, index) => (
+              <li key={index} className="rounded-lg bg-canvas px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-ink">{source.source}</span>
+                  <span className="text-xs font-medium text-ink">{source.price}</span>
+                </div>
+                <p className="mt-0.5 text-xs text-muted">{source.description}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
         <span className="text-sm text-ink">Include in sale</span>
