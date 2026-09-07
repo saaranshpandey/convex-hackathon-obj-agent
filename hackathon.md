@@ -12,7 +12,7 @@
 - **Auth:** none
 - **AI models:** gpt-5.6-luna, fal-ai/sam2/image
 - **Started:** 2026-09-07T05:06:14Z
-- **Last updated:** 2026-09-07T06:54:24Z
+- **Last updated:** 2026-09-07T07:42:32Z
 
 ## Log
 
@@ -37,3 +37,17 @@ an object the detector missed. Convex features: schema, indexes, queries,
 mutations, actions, internal functions, scheduled functions, file storage,
 realtime queries (`convex/schema.ts`, `convex/detection.ts`, `convex/masks.ts`,
 `convex/segmentation/`, `src/components/ObjectCanvas.tsx`, `src/lib/masks.ts`).
+
+### 2026-09-07 - 433ad38
+Added Phase 4: selling agents. Each selected item gets its own job that
+identifies it with OpenAI structured outputs (brand and model only when
+actually visible, never guessed) then prices it by feeding Firecrawl web
+search snippets into a second OpenAI call for a price range, a recommended
+price, and up to three cited market comparisons — the rationale it writes
+keeps observed evidence separate from inference. Items run independently
+(queued → identifying → researching → ready_for_review) so one item's
+failure never blocks the others; a status bar shows live per-item progress
+and the detail panel shows the full pricing breakdown. Verified against real
+OpenAI and Firecrawl calls across three item categories (`convex/research.ts`,
+`convex/identify.ts`, `convex/priceResearch.ts`,
+`src/components/ResearchStatusBar.tsx`, `src/components/DetailPanel.tsx`).
