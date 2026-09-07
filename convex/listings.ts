@@ -117,25 +117,3 @@ export const approve = mutation({
     return null;
   },
 });
-
-/** Bulk-publishes every currently-approved listing; drafts are left untouched. */
-export const listApproved = mutation({
-  args: { cleanoutId: v.id("cleanouts") },
-  handler: async (ctx, args) => {
-    const listings = await ctx.db
-      .query("listings")
-      .withIndex("by_cleanoutId", (q) => q.eq("cleanoutId", args.cleanoutId))
-      .take(50);
-
-    const approved = listings.filter((listing) => listing.status === "approved");
-    for (const listing of approved) {
-      await ctx.db.patch("listings", listing._id, {
-        status: "listed",
-        updatedAt: Date.now(),
-      });
-      await ctx.db.patch("items", listing.itemId, { status: "listed" });
-    }
-
-    return { listed: approved.length };
-  },
-});
