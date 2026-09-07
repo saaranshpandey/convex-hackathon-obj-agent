@@ -35,6 +35,9 @@ export default function App() {
   const [drawing, setDrawing] = useState(false);
   const [activeId, setActiveId] = useState<Id<"items"> | null>(null);
   const [hoveredId, setHoveredId] = useState<Id<"items"> | null>(null);
+  const [reviewingListingId, setReviewingListingId] = useState<Id<"listings"> | null>(
+    null,
+  );
 
   const items: WorkspaceItem[] = useMemo(
     () =>
@@ -44,6 +47,7 @@ export default function App() {
       })),
     [workspace?.items],
   );
+  const listings = workspace?.listings ?? [];
 
   const startCleanout = useCallback(
     async (blob: Blob, title: string) => {
@@ -189,9 +193,11 @@ export default function App() {
                 cleanout={workspace.cleanout}
                 imageUrl={workspace.imageUrl}
                 items={items}
+                listings={listings}
                 activeId={activeId}
                 hoveredId={hoveredId}
                 drawing={drawing}
+                reviewingListingId={reviewingListingId}
                 onToggle={(itemId) => {
                   setActiveId(itemId);
                   void toggleItem({ itemId });
@@ -227,6 +233,19 @@ export default function App() {
                 onContinue={() =>
                   void startResearch({ cleanoutId: workspace.cleanout._id })
                 }
+                onReviewListing={setReviewingListingId}
+                onCloseDrawer={() => setReviewingListingId(null)}
+                onNavigateListing={(direction) => {
+                  setReviewingListingId((current) => {
+                    if (current === null) return current;
+                    const index = listings.findIndex(
+                      (listing) => listing._id === current,
+                    );
+                    if (index === -1) return current;
+                    const nextIndex = direction === "next" ? index + 1 : index - 1;
+                    return listings[nextIndex]?._id ?? current;
+                  });
+                }}
               />
             </motion.div>
           )}

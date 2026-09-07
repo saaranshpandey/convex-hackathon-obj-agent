@@ -1,3 +1,4 @@
+import { AnimatePresence } from "motion/react";
 import { AlertCircle, Loader2, SearchX } from "lucide-react";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import type { Rect, WorkspaceItem } from "@/lib/geometry";
@@ -6,15 +7,19 @@ import CanvasToolbar from "@/components/CanvasToolbar";
 import ObjectChips from "@/components/ObjectChips";
 import DetailPanel from "@/components/DetailPanel";
 import ResearchStatusBar from "@/components/ResearchStatusBar";
+import ListingsBar from "@/components/ListingsBar";
+import ListingDrawer from "@/components/ListingDrawer";
 import { Button } from "@/components/ui/button";
 
 type Props = {
   cleanout: Doc<"cleanouts">;
   imageUrl: string | null;
   items: WorkspaceItem[];
+  listings: Doc<"listings">[];
   activeId: Id<"items"> | null;
   hoveredId: Id<"items"> | null;
   drawing: boolean;
+  reviewingListingId: Id<"listings"> | null;
   onToggle: (id: Id<"items">) => void;
   onHover: (id: Id<"items"> | null) => void;
   onActivate: (id: Id<"items"> | null) => void;
@@ -27,15 +32,20 @@ type Props = {
   onRetry: () => void;
   onNewPhoto: () => void;
   onContinue: () => void;
+  onReviewListing: (listingId: Id<"listings">) => void;
+  onCloseDrawer: () => void;
+  onNavigateListing: (direction: "prev" | "next") => void;
 };
 
 export default function Workspace({
   cleanout,
   imageUrl,
   items,
+  listings,
   activeId,
   hoveredId,
   drawing,
+  reviewingListingId,
   onToggle,
   onHover,
   onActivate,
@@ -48,6 +58,9 @@ export default function Workspace({
   onRetry,
   onNewPhoto,
   onContinue,
+  onReviewListing,
+  onCloseDrawer,
+  onNavigateListing,
 }: Props) {
   if (cleanout.status === "uploading") {
     return (
@@ -108,6 +121,14 @@ export default function Workspace({
         item.researchStatus === "identifying" ||
         item.researchStatus === "researching"),
   );
+  const activeListing =
+    listings.find((listing) => listing._id === reviewingListingId) ?? null;
+  const activeListingItem = activeListing
+    ? (items.find((item) => item._id === activeListing.itemId) ?? null)
+    : null;
+  const activeListingIndex = activeListing
+    ? listings.findIndex((listing) => listing._id === activeListing._id)
+    : -1;
 
   return (
     <div className="space-y-5 pt-3">
@@ -183,6 +204,7 @@ export default function Workspace({
           cleanoutId={cleanout._id}
           imageUrl={imageUrl}
           items={items}
+          listings={listings}
           activeId={activeId}
           provider={cleanout.provider}
           onToggle={onToggle}
@@ -190,9 +212,33 @@ export default function Workspace({
           onHover={onHover}
           onRename={onRename}
           onRemove={onRemove}
+          onReviewListing={onReviewListing}
         />
       )}
       </div>
+
+      <ListingsBar
+        cleanoutId={cleanout._id}
+        listings={listings}
+        onReviewAll={() => {
+          if (listings[0]) onReviewListing(listings[0]._id);
+        }}
+      />
+
+      <AnimatePresence>
+        {activeListing && activeListingItem && (
+          <ListingDrawer
+            key={activeListing._id}
+            imageUrl={imageUrl}
+            listing={activeListing}
+            item={activeListingItem}
+            hasPrev={activeListingIndex > 0}
+            hasNext={activeListingIndex < listings.length - 1}
+            onNavigate={onNavigateListing}
+            onClose={onCloseDrawer}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
