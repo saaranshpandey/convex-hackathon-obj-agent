@@ -1,46 +1,56 @@
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft, PackageOpen } from "lucide-react";
-import type { DetectedObject } from "@/data/demoObjects";
+import { ChevronLeft, PackageOpen, Pencil, Trash2 } from "lucide-react";
+import type { Id } from "../../convex/_generated/dataModel";
+import type { WorkspaceItem } from "@/lib/geometry";
 import ObjectThumb from "@/components/ObjectThumb";
+import ActivityFeed from "@/components/ActivityFeed";
 import { cn } from "@/lib/utils";
 
 type Props = {
+  cleanoutId: Id<"cleanouts">;
   imageUrl: string;
-  objects: DetectedObject[];
-  selected: Set<string>;
-  activeId: string | null;
-  onToggle: (id: string) => void;
-  onActivate: (id: string | null) => void;
-  onHover: (id: string | null) => void;
+  items: WorkspaceItem[];
+  activeId: Id<"items"> | null;
+  provider?: string;
+  onToggle: (id: Id<"items">) => void;
+  onActivate: (id: Id<"items"> | null) => void;
+  onHover: (id: Id<"items"> | null) => void;
+  onRename: (id: Id<"items">, name: string) => void;
+  onRemove: (id: Id<"items">) => void;
 };
 
 export default function DetailPanel({
+  cleanoutId,
   imageUrl,
-  objects,
-  selected,
+  items,
   activeId,
+  provider,
   onToggle,
   onActivate,
   onHover,
+  onRename,
+  onRemove,
 }: Props) {
-  const active = objects.find((o) => o.id === activeId) ?? null;
+  const active = items.find((item) => item._id === activeId) ?? null;
 
   return (
     <aside className="surface p-5 lg:sticky lg:top-24 lg:self-start">
       <AnimatePresence mode="wait" initial={false}>
         {active ? (
           <motion.div
-            key={active.id}
+            key={active._id}
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
-            <ObjectDetail
+            <ItemDetail
               imageUrl={imageUrl}
-              object={active}
-              isSelected={selected.has(active.id)}
+              item={active}
               onToggle={onToggle}
+              onRename={onRename}
+              onRemove={onRemove}
               onBack={() => onActivate(null)}
             />
           </motion.div>
@@ -53,9 +63,10 @@ export default function DetailPanel({
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
           >
             <SelectionSummary
+              cleanoutId={cleanoutId}
               imageUrl={imageUrl}
-              objects={objects}
-              selected={selected}
+              items={items}
+              provider={provider}
               onActivate={onActivate}
               onHover={onHover}
             />
@@ -67,19 +78,21 @@ export default function DetailPanel({
 }
 
 function SelectionSummary({
+  cleanoutId,
   imageUrl,
-  objects,
-  selected,
+  items,
+  provider,
   onActivate,
   onHover,
 }: {
+  cleanoutId: Id<"cleanouts">;
   imageUrl: string;
-  objects: DetectedObject[];
-  selected: Set<string>;
-  onActivate: (id: string) => void;
-  onHover: (id: string | null) => void;
+  items: WorkspaceItem[];
+  provider?: string;
+  onActivate: (id: Id<"items">) => void;
+  onHover: (id: Id<"items"> | null) => void;
 }) {
-  const chosen = objects.filter((o) => selected.has(o.id));
+  const chosen = items.filter((item) => item.selected);
 
   return (
     <div>
@@ -101,17 +114,21 @@ function SelectionSummary({
         </div>
       ) : (
         <ul className="mt-5 space-y-1">
-          {chosen.map((o) => (
-            <li key={o.id}>
+          {chosen.map((item) => (
+            <li key={item._id}>
               <button
-                onClick={() => onActivate(o.id)}
-                onPointerEnter={() => onHover(o.id)}
+                onClick={() => onActivate(item._id)}
+                onPointerEnter={() => onHover(item._id)}
                 onPointerLeave={() => onHover(null)}
                 className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-canvas"
               >
-                <ObjectThumb imageUrl={imageUrl} bbox={o.bbox} className="h-10" />
+                <ObjectThumb
+                  imageUrl={imageUrl}
+                  bbox={item.bbox}
+                  className="h-10"
+                />
                 <span className="flex-1 text-sm font-medium text-ink">
-                  {o.name}
+                  {item.name}
                 </span>
                 <span className="text-sm text-muted">—</span>
               </button>
@@ -124,23 +141,53 @@ function SelectionSummary({
         <span className="text-sm text-muted">Estimated total</span>
         <span className="text-sm font-medium text-muted">—</span>
       </div>
+
+      <div className="mt-5 border-t border-line pt-4">
+        <div className="flex items-baseline justify-between">
+          <h3 className="text-xs font-medium tracking-wide text-muted uppercase">
+            Activity
+          </h3>
+          {provider && (
+            <span className="text-[11px] text-muted/80">{provider}</span>
+          )}
+        </div>
+        <ActivityFeed cleanoutId={cleanoutId} />
+      </div>
     </div>
   );
 }
 
-function ObjectDetail({
+function ItemDetail({
   imageUrl,
-  object,
-  isSelected,
+  item,
   onToggle,
+  onRename,
+  onRemove,
   onBack,
 }: {
   imageUrl: string;
-  object: DetectedObject;
-  isSelected: boolean;
-  onToggle: (id: string) => void;
+  item: WorkspaceItem;
+  onToggle: (id: Id<"items">) => void;
+  onRename: (id: Id<"items">, name: string) => void;
+  onRemove: (id: Id<"items">) => void;
   onBack: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.name);
+
+  // A rename from another window should win over a stale local draft.
+  useEffect(() => {
+    setDraft(item.name);
+    setEditing(false);
+  }, [item._id, item.name]);
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next.length > 0 && next !== item.name) onRename(item._id, next);
+    else setDraft(item.name);
+    setEditing(false);
+  };
+
   return (
     <div>
       <button
@@ -152,28 +199,75 @@ function ObjectDetail({
       </button>
 
       <div className="mt-4 flex justify-center rounded-xl bg-canvas p-4">
-        <ObjectThumb imageUrl={imageUrl} bbox={object.bbox} className="h-36" />
+        <ObjectThumb imageUrl={imageUrl} bbox={item.bbox} className="h-36" />
       </div>
 
-      <h2 className="mt-5 text-xl font-semibold tracking-[-0.02em] text-ink">
-        {object.name}
-      </h2>
+      {editing ? (
+        <input
+          autoFocus
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commit();
+            if (event.key === "Escape") {
+              setDraft(item.name);
+              setEditing(false);
+            }
+          }}
+          className="mt-5 w-full rounded-lg bg-canvas px-3 py-2 text-xl font-semibold tracking-[-0.02em] text-ink outline-none"
+        />
+      ) : (
+        <button
+          onClick={() => setEditing(true)}
+          className="group mt-5 flex w-full items-center gap-2 rounded-lg text-left"
+          title="Rename"
+        >
+          <span className="text-xl font-semibold tracking-[-0.02em] text-ink">
+            {item.name}
+          </span>
+          <Pencil
+            className="size-3.5 text-muted opacity-0 transition-opacity group-hover:opacity-100"
+            strokeWidth={2}
+          />
+        </button>
+      )}
+
+      <p className="mt-1 text-sm text-muted">
+        {item.category.replace(/_/g, " ")}
+        {item.source === "detected" && (
+          <>
+            <span className="px-1.5 text-line-strong">·</span>
+            {Math.round(item.confidence * 100)}% confident
+          </>
+        )}
+        {item.source === "manual" && (
+          <>
+            <span className="px-1.5 text-line-strong">·</span>
+            added by you
+          </>
+        )}
+      </p>
 
       <div className="mt-4 flex items-baseline justify-between border-t border-line pt-4">
         <span className="text-sm text-muted">Estimated value</span>
-        <span className="text-sm font-medium text-muted">—</span>
+        <span className="text-sm font-medium text-muted">
+          {item.estimatedLow !== undefined && item.estimatedHigh !== undefined
+            ? `$${item.estimatedLow}–$${item.estimatedHigh}`
+            : "—"}
+        </span>
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
         <span className="text-sm text-ink">Include in sale</span>
         <button
           role="switch"
-          aria-checked={isSelected}
-          aria-label={`Include ${object.name} in sale`}
-          onClick={() => onToggle(object.id)}
+          aria-checked={item.selected}
+          aria-label={`Include ${item.name} in sale`}
+          onClick={() => onToggle(item._id)}
           className={cn(
             "relative h-6 w-10 rounded-full transition-colors duration-200",
-            isSelected ? "bg-accent-deep" : "bg-line-strong",
+            item.selected ? "bg-accent-deep" : "bg-line-strong",
           )}
         >
           <motion.span
@@ -181,18 +275,28 @@ function ObjectDetail({
             transition={{ type: "spring", stiffness: 700, damping: 34 }}
             className={cn(
               "absolute top-0.5 size-5 rounded-full bg-surface shadow-[0_1px_3px_rgb(20_20_18/0.28)]",
-              isSelected ? "left-[18px]" : "left-0.5",
+              item.selected ? "left-[18px]" : "left-0.5",
             )}
           />
         </button>
       </div>
 
       <button
-        onClick={() => onToggle(object.id)}
+        onClick={() => onToggle(item._id)}
         className="mt-5 w-full rounded-full py-2.5 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink"
       >
-        {isSelected ? "Remove from sale" : "Add to sale"}
+        {item.selected ? "Remove from sale" : "Add to sale"}
       </button>
+
+      {item.source === "manual" && (
+        <button
+          onClick={() => onRemove(item._id)}
+          className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-medium text-muted transition-colors hover:bg-canvas hover:text-ink"
+        >
+          <Trash2 className="size-3.5" strokeWidth={2} />
+          Delete this item
+        </button>
+      )}
     </div>
   );
 }

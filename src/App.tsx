@@ -1,81 +1,165 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
 import TopNav from "@/components/TopNav";
 import EmptyState from "@/components/EmptyState";
 import Workspace from "@/components/Workspace";
+import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import demoRoom from "@/assets/demo-room.svg";
-import { DEMO_OBJECTS } from "@/data/demoObjects";
-
-type Phase = "empty" | "scanning" | "workspace";
-
-const SCAN_MS = 1100;
-
-const defaultSelection = () =>
-  new Set(DEMO_OBJECTS.filter((o) => o.defaultSelected).map((o) => o.id));
+import { useSessionId } from "@/lib/session";
+import { prepareUpload } from "@/lib/image";
+import { bboxOf, type Rect, type WorkspaceItem } from "@/lib/geometry";
 
 export default function App() {
-  const [phase, setPhase] = useState<Phase>("empty");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(defaultSelection);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const sessionId = useSessionId();
+  const workspace = useQuery(api.cleanouts.latestForSession, { sessionId });
 
-  // Object URLs from uploads must be released; the bundled demo URL must not be.
-  const objectUrlRef = useRef<string | null>(null);
+  const generateUploadUrl = useMutation(api.cleanouts.generateUploadUrl);
+  const startCleanoutMutation = useMutation(api.cleanouts.start);
+  const attachImage = useMutation(api.cleanouts.attachImage);
+  const markUploadFailed = useMutation(api.cleanouts.markUploadFailed);
+  const retryAnalysis = useMutation(api.cleanouts.retryAnalysis);
+  const toggleItem = useMutation(api.items.toggle);
+  const setAllItems = useMutation(api.items.setAll);
+  const renameItem = useMutation(api.items.rename);
+  const addManualItem = useMutation(api.items.addManual);
+  const removeItem = useMutation(api.items.remove);
+  const resetDemoData = useMutation(api.dev.resetDemoData);
 
-  const loadImage = useCallback((url: string, isObjectUrl: boolean) => {
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = isObjectUrl ? url : null;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [composingNew, setComposingNew] = useState(false);
+  const [drawing, setDrawing] = useState(false);
+  const [activeId, setActiveId] = useState<Id<"items"> | null>(null);
+  const [hoveredId, setHoveredId] = useState<Id<"items"> | null>(null);
 
-    setImageUrl(url);
-    setSelected(defaultSelection());
-    setActiveId(null);
-    setHoveredId(null);
-    setPhase("scanning");
-  }, []);
-
-  const reset = useCallback(() => {
-    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    objectUrlRef.current = null;
-    setImageUrl(null);
-    setPhase("empty");
-  }, []);
-
-  useEffect(() => {
-    if (phase !== "scanning") return;
-    const id = window.setTimeout(() => setPhase("workspace"), SCAN_MS);
-    return () => window.clearTimeout(id);
-  }, [phase]);
-
-  useEffect(() => {
-    return () => {
-      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-    };
-  }, []);
-
-  const toggle = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    setActiveId(id);
-  }, []);
-
-  const selectAll = useCallback(
-    () => setSelected(new Set(DEMO_OBJECTS.map((o) => o.id))),
-    [],
+  const items: WorkspaceItem[] = useMemo(
+    () =>
+      (workspace?.items ?? []).map((item) => ({
+        ...item,
+        bbox: bboxOf(item.polygon),
+      })),
+    [workspace?.items],
   );
-  const clearAll = useCallback(() => setSelected(new Set()), []);
+
+  const startCleanout = useCallback(
+    async (blob: Blob, title: string) => {
+      setBusy(true);
+      setError(null);
+
+      let cleanoutId: Id<"cleanouts"> | undefined;
+      try {
+        cleanoutId = await startCleanoutMutation({ sessionId, title });
+        // The workspace can now show its uploading state.
+        setActiveId(null);
+        setComposingNew(false);
+
+        const prepared = await prepareUpload(blob);
+
+        const uploadUrl = await generateUploadUrl();
+        const result = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": prepared.blob.type },
+          body: prepared.blob,
+        });
+        if (!result.ok) {
+          throw new Error(`Upload failed with status ${result.status}`);
+        }
+        const { storageId } = (await result.json()) as {
+          storageId: Id<"_storage">;
+        };
+
+        await attachImage({
+          cleanoutId,
+          storageId,
+          imageWidth: prepared.width || undefined,
+          imageHeight: prepared.height || undefined,
+        });
+      } catch (cause) {
+        const message =
+          cause instanceof Error
+            ? cause.message
+            : "Something went wrong uploading that photo.";
+
+        if (cleanoutId === undefined) {
+          setError(message);
+        } else {
+          // Surface it on the cleanout so the workspace offers a way out.
+          await markUploadFailed({ cleanoutId, error: message }).catch(() => {});
+        }
+      } finally {
+        setBusy(false);
+      }
+    },
+    [
+      attachImage,
+      generateUploadUrl,
+      markUploadFailed,
+      sessionId,
+      startCleanoutMutation,
+    ],
+  );
+
+  const startDemo = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(demoRoom);
+      const blob = await response.blob();
+      await startCleanout(blob, "Demo room");
+    } catch {
+      setError("Could not load the demo room image.");
+      setBusy(false);
+    }
+  }, [startCleanout]);
+
+  const handleReset = useCallback(async () => {
+    setBusy(true);
+    try {
+      await resetDemoData({ sessionId });
+      setActiveId(null);
+      setComposingNew(false);
+      setDrawing(false);
+      setError(null);
+    } finally {
+      setBusy(false);
+    }
+  }, [resetDemoData, sessionId]);
+
+  const handleAddItem = useCallback(
+    async (name: string, box: Rect) => {
+      if (!workspace) return;
+      await addManualItem({
+        cleanoutId: workspace.cleanout._id,
+        name,
+        boundingBox: box,
+      });
+      setDrawing(false);
+    },
+    [addManualItem, workspace],
+  );
+
+  const showEmptyState = workspace === null || composingNew;
 
   return (
     <div className="min-h-dvh">
-      <TopNav onHome={reset} />
+      <TopNav
+        onHome={() => {
+          setDrawing(false);
+          setComposingNew(true);
+        }}
+        onReset={import.meta.env.DEV ? handleReset : undefined}
+      />
 
       <main className="mx-auto w-full max-w-[1600px] px-6 pb-16 sm:px-8">
         <AnimatePresence mode="wait">
-          {imageUrl === null ? (
+          {workspace === undefined ? (
+            <motion.div key="loading" exit={{ opacity: 0 }}>
+              <WorkspaceSkeleton />
+            </motion.div>
+          ) : showEmptyState ? (
             <motion.div
               key="empty"
               initial={{ opacity: 0, y: 8 }}
@@ -84,8 +168,13 @@ export default function App() {
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
               <EmptyState
-                onUpload={(file) => loadImage(URL.createObjectURL(file), true)}
-                onDemo={() => loadImage(demoRoom, false)}
+                busy={busy}
+                error={error}
+                onUpload={(file) => void startCleanout(file, file.name)}
+                onDemo={() => void startDemo()}
+                onBack={
+                  workspace !== null ? () => setComposingNew(false) : undefined
+                }
               />
             </motion.div>
           ) : (
@@ -96,17 +185,44 @@ export default function App() {
               transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             >
               <Workspace
-                imageUrl={imageUrl}
-                objects={DEMO_OBJECTS}
-                scanning={phase === "scanning"}
-                selected={selected}
+                cleanout={workspace.cleanout}
+                imageUrl={workspace.imageUrl}
+                items={items}
                 activeId={activeId}
                 hoveredId={hoveredId}
-                onToggle={toggle}
+                drawing={drawing}
+                onToggle={(itemId) => {
+                  setActiveId(itemId);
+                  void toggleItem({ itemId });
+                }}
                 onHover={setHoveredId}
                 onActivate={setActiveId}
-                onSelectAll={selectAll}
-                onClear={clearAll}
+                onRename={(itemId, name) => void renameItem({ itemId, name })}
+                onRemove={(itemId) => {
+                  setActiveId(null);
+                  void removeItem({ itemId });
+                }}
+                onSelectAll={() =>
+                  void setAllItems({
+                    cleanoutId: workspace.cleanout._id,
+                    selected: true,
+                  })
+                }
+                onClear={() =>
+                  void setAllItems({
+                    cleanoutId: workspace.cleanout._id,
+                    selected: false,
+                  })
+                }
+                onToggleDrawing={() => setDrawing((previous) => !previous)}
+                onAddItem={handleAddItem}
+                onRetry={() =>
+                  void retryAnalysis({ cleanoutId: workspace.cleanout._id })
+                }
+                onNewPhoto={() => {
+                  setDrawing(false);
+                  setComposingNew(true);
+                }}
               />
             </motion.div>
           )}

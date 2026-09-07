@@ -1,80 +1,191 @@
-import type { DetectedObject } from "@/data/demoObjects";
+import { AlertCircle, Loader2, SearchX } from "lucide-react";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
+import type { Rect, WorkspaceItem } from "@/lib/geometry";
 import PhotoCanvas from "@/components/PhotoCanvas";
 import CanvasToolbar from "@/components/CanvasToolbar";
 import ObjectChips from "@/components/ObjectChips";
 import DetailPanel from "@/components/DetailPanel";
+import { Button } from "@/components/ui/button";
 
 type Props = {
-  imageUrl: string;
-  objects: DetectedObject[];
-  scanning: boolean;
-  selected: Set<string>;
-  activeId: string | null;
-  hoveredId: string | null;
-  onToggle: (id: string) => void;
-  onHover: (id: string | null) => void;
-  onActivate: (id: string | null) => void;
+  cleanout: Doc<"cleanouts">;
+  imageUrl: string | null;
+  items: WorkspaceItem[];
+  activeId: Id<"items"> | null;
+  hoveredId: Id<"items"> | null;
+  drawing: boolean;
+  onToggle: (id: Id<"items">) => void;
+  onHover: (id: Id<"items"> | null) => void;
+  onActivate: (id: Id<"items"> | null) => void;
+  onRename: (id: Id<"items">, name: string) => void;
+  onRemove: (id: Id<"items">) => void;
   onSelectAll: () => void;
   onClear: () => void;
+  onToggleDrawing: () => void;
+  onAddItem: (name: string, box: Rect) => void;
+  onRetry: () => void;
+  onNewPhoto: () => void;
 };
 
 export default function Workspace({
+  cleanout,
   imageUrl,
-  objects,
-  scanning,
-  selected,
+  items,
   activeId,
   hoveredId,
+  drawing,
   onToggle,
   onHover,
   onActivate,
+  onRename,
+  onRemove,
   onSelectAll,
   onClear,
+  onToggleDrawing,
+  onAddItem,
+  onRetry,
+  onNewPhoto,
 }: Props) {
+  if (cleanout.status === "uploading") {
+    return (
+      <Card>
+        <Loader2 className="size-5 animate-spin text-muted" strokeWidth={1.75} />
+        <p className="mt-4 text-sm text-ink-soft">Uploading your photo…</p>
+      </Card>
+    );
+  }
+
+  if (cleanout.status === "failed") {
+    return (
+      <Card>
+        <AlertCircle className="size-5 text-muted" strokeWidth={1.75} />
+        <h2 className="mt-4 text-[15px] font-semibold text-ink">
+          That scan didn't work
+        </h2>
+        <p className="mt-2 text-sm text-pretty text-ink-soft">
+          {cleanout.error ?? "Detection failed for this photo."}
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          {cleanout.imageStorageId && (
+            <Button size="sm" onClick={onRetry}>
+              Try again
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={onNewPhoto}>
+            Use a different photo
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (imageUrl === null) {
+    return (
+      <Card>
+        <AlertCircle className="size-5 text-muted" strokeWidth={1.75} />
+        <p className="mt-4 text-sm text-ink-soft">
+          That room photo is no longer available in storage.
+        </p>
+        <Button size="sm" variant="outline" className="mt-6" onClick={onNewPhoto}>
+          Upload another
+        </Button>
+      </Card>
+    );
+  }
+
+  const scanning = cleanout.status === "analyzing";
+  const revealing = cleanout.status === "objects_found";
+  const ready = cleanout.status === "ready";
+  const foundNothing = ready && items.length === 0;
+  const selectedCount = items.filter((item) => item.selected).length;
+
   return (
     <div className="grid gap-7 pt-3 lg:grid-cols-[minmax(0,2.05fr)_minmax(0,1fr)] lg:gap-8">
       <div className="min-w-0 space-y-5">
         <PhotoCanvas
           imageUrl={imageUrl}
-          objects={objects}
+          items={items}
           scanning={scanning}
-          selected={selected}
+          scanLabel="Scanning room…"
+          drawing={drawing}
           hoveredId={hoveredId}
           activeId={activeId}
           onToggle={onToggle}
           onHover={onHover}
+          onAddItem={onAddItem}
+          onCancelDrawing={onToggleDrawing}
         />
 
-        {!scanning && (
+        {foundNothing && (
+          <div className="surface flex flex-col items-center px-8 py-8 text-center">
+            <SearchX className="size-5 text-muted" strokeWidth={1.75} />
+            <h2 className="mt-4 text-[15px] font-semibold text-ink">
+              Nothing sellable in this one
+            </h2>
+            <p className="mt-2 max-w-sm text-sm text-pretty text-ink-soft">
+              The scan finished but didn't find any discrete objects worth
+              listing. You can scan again, add something by hand, or try a
+              different photo.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              <Button size="sm" onClick={onRetry}>
+                Scan again
+              </Button>
+              <Button size="sm" variant="outline" onClick={onToggleDrawing}>
+                Add one by hand
+              </Button>
+              <Button size="sm" variant="ghost" onClick={onNewPhoto}>
+                Different photo
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Interactive as soon as boxes exist — the reveal is only visual, and
+            mask refinement runs separately without blocking anything here. */}
+        {(ready || revealing) && !foundNothing && (
           <>
             <CanvasToolbar
-              total={objects.length}
-              selectedCount={selected.size}
+              total={items.length}
+              selectedCount={selectedCount}
+              drawing={drawing}
               onSelectAll={onSelectAll}
               onClear={onClear}
+              onToggleDrawing={onToggleDrawing}
             />
             <ObjectChips
-              objects={objects}
-              selected={selected}
+              items={items}
               hoveredId={hoveredId}
               onToggle={onToggle}
               onHover={onHover}
             />
           </>
         )}
+
       </div>
 
-      {!scanning && (
+      {(ready || revealing) && (
         <DetailPanel
+          cleanoutId={cleanout._id}
           imageUrl={imageUrl}
-          objects={objects}
-          selected={selected}
+          items={items}
           activeId={activeId}
+          provider={cleanout.provider}
           onToggle={onToggle}
           onActivate={onActivate}
           onHover={onHover}
+          onRename={onRename}
+          onRemove={onRemove}
         />
       )}
+    </div>
+  );
+}
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="surface mx-auto mt-16 flex max-w-md flex-col items-center px-8 py-12 text-center">
+      {children}
     </div>
   );
 }
