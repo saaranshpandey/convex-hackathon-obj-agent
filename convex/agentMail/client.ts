@@ -35,7 +35,14 @@ async function agentMailRequest(
   return text ? (JSON.parse(text) as Record<string, unknown>) : {};
 }
 
-export async function getOrCreateInbox(apiKey: string): Promise<{ inboxId: string; email: string }> {
+export async function getOrCreateInbox(
+  apiKey: string,
+  knownInboxId?: string,
+): Promise<{ inboxId: string; email: string }> {
+  // An operator-assigned existing inbox (e.g. the account is at its plan's
+  // inbox limit) takes priority over creating a new one.
+  if (knownInboxId) return { inboxId: knownInboxId, email: knownInboxId };
+
   const payload = await agentMailRequest(apiKey, "POST", "/v0/inboxes", {
     client_id: INBOX_CLIENT_ID,
     display_name: "Roomsale selling agent",

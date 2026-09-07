@@ -157,7 +157,7 @@ export const sendDecisionEmail = internalAction({
         ? `Your ${itemName} is listed at $${listing.price}.\n\nA buyer offered $${args.amount}.\n\nReply with:\nACCEPT\nCOUNTER ${args.amount}\nDECLINE`
         : `Your ${itemName} has had no interest for 5 days.\nI recommend lowering $${listing.price} → $${args.amount}.\nReply YES or KEEP.`;
 
-    const inbox = await getOrCreateInbox(apiKey);
+    const inbox = await getOrCreateInbox(apiKey, env.AGENTMAIL_INBOX_ID?.trim());
     const result = await sendMessage(apiKey, inbox.inboxId, { to: notifyEmail, subject, text });
 
     await ctx.runMutation(internal.agentMail.recordOutbound, {
@@ -351,7 +351,7 @@ export const handleInboundReply = internalAction({
       const notifyEmail = env.USER_NOTIFY_EMAIL?.trim();
       const mailKey = env.AGENTMAIL_API_KEY?.trim();
       if (notifyEmail && mailKey) {
-        const inbox = await getOrCreateInbox(mailKey);
+        const inbox = await getOrCreateInbox(mailKey, env.AGENTMAIL_INBOX_ID?.trim());
         await sendMessage(mailKey, inbox.inboxId, {
           to: notifyEmail,
           subject: "Quick clarification needed",
