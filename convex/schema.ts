@@ -70,6 +70,14 @@ export const researchSourceValidator = v.object({
 export const listingStatus = v.union(
   v.literal("draft"),
   v.literal("approved"),
+  v.literal("publishing"),
+  v.literal("live"),
+  v.literal("failed"),
+  v.literal("ended"),
+  v.literal("sold"),
+  // Legacy alias from Phase 5's bulk "List approved items" — no code path
+  // produces this anymore (superseded by "live"), kept so existing rows
+  // don't need a migration.
   v.literal("listed"),
 );
 
@@ -174,7 +182,27 @@ export default defineSchema({
     status: listingStatus,
     createdAt: v.number(),
     updatedAt: v.number(),
+
+    // Phase 6: eBay publish result, independent per listing.
+    ebayListingId: v.optional(v.string()),
+    ebayOfferId: v.optional(v.string()),
+    ebayListingUrl: v.optional(v.string()),
+    publishError: v.optional(v.string()),
+    /** "mock" | "sandbox" — which mode actually produced this result. */
+    publishMode: v.optional(v.string()),
   })
     .index("by_cleanoutId", ["cleanoutId"])
     .index("by_itemId", ["itemId"]),
+
+  ebayConnections: defineTable({
+    sessionId: v.string(),
+    accessToken: v.string(),
+    refreshToken: v.string(),
+    accessTokenExpiresAt: v.number(),
+    refreshTokenExpiresAt: v.optional(v.number()),
+    /** "mock" | "sandbox". */
+    mode: v.string(),
+    connectedAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_sessionId", ["sessionId"]),
 });
