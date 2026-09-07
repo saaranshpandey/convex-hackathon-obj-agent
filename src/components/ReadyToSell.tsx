@@ -13,8 +13,15 @@ type Props = {
 const STATUS_LABEL: Record<Doc<"listings">["status"], string> = {
   draft: "Ready",
   approved: "Approved",
+  publishing: "Publishing…",
+  live: "● Live on eBay",
+  failed: "Failed",
+  ended: "Ended",
+  sold: "Sold",
   listed: "Listed",
 };
+
+const LIVE_STATUSES = new Set<Doc<"listings">["status"]>(["live", "sold", "ended"]);
 
 export default function ReadyToSell({
   imageUrl,
@@ -51,12 +58,23 @@ export default function ReadyToSell({
                 <span className="rounded-full bg-canvas px-2.5 py-1 text-xs font-medium text-ink-soft ring-1 ring-line ring-inset">
                   {STATUS_LABEL[listing.status]}
                 </span>
-                <button
-                  onClick={() => onReview(listing._id)}
-                  className="rounded-full px-3 py-1.5 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink"
-                >
-                  Review
-                </button>
+                {LIVE_STATUSES.has(listing.status) && listing.ebayListingUrl ? (
+                  <a
+                    href={listing.ebayListingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full px-3 py-1.5 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink"
+                  >
+                    View listing
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => onReview(listing._id)}
+                    className="rounded-full px-3 py-1.5 text-sm font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink"
+                  >
+                    Review
+                  </button>
+                )}
               </div>
             </li>
           );
