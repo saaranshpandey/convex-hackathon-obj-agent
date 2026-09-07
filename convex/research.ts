@@ -16,6 +16,7 @@ import {
 } from "./schema";
 import { identifyItem, ResearchError, type IdentificationResult } from "./identify";
 import { priceItem } from "./priceResearch";
+import { generateListing } from "./generateListing";
 
 /** How many items may be researched at once. Same bound as mask refinement. */
 const RESEARCH_CONCURRENCY = 4;
@@ -71,6 +72,7 @@ export const startResearch = mutation({
         pricingRationale: undefined,
         researchSources: undefined,
       });
+      await ctx.runMutation(internal.listings.clearForItem, { itemId: item._id });
     }
 
     await recordActivity(ctx, {
@@ -295,6 +297,35 @@ export const researchCleanout = internalAction({
           rationale: pricing.rationale,
           sources: pricing.sources,
         });
+
+        // A listing-draft failure doesn't undo a successful identification +
+        // price — the item stays ready_for_review, it just has no draft yet.
+        try {
+          const listing = await withRetry(() =>
+            generateListing({
+              apiKey: openaiKey,
+              model,
+              identification,
+              estimatedLow: pricing.estimatedLow,
+              estimatedHigh: pricing.estimatedHigh,
+              recommendedPrice: pricing.recommendedPrice,
+              rationale: pricing.rationale,
+            }),
+          );
+
+          await ctx.runMutation(internal.listings.saveDraft, {
+            cleanoutId: args.cleanoutId,
+            itemId: item._id,
+            marketplace: "ebay",
+            title: listing.title,
+            description: listing.description,
+            category: listing.category,
+            condition: listing.condition,
+            price: listing.price,
+          });
+        } catch {
+          // Swallowed intentionally — see comment above.
+        }
       } catch (error) {
         await ctx.runMutation(internal.research.markResearchFailed, {
           itemId: item._id,
