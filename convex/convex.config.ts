@@ -17,5 +17,8 @@ export default defineApp({
     FAL_MASK_MODEL: v.optional(v.string()),
     /** "fal" | "off" | "auto". */
     MASK_MODE: v.optional(v.string()),
+
+    /** Enables Phase 4 resale research (Firecrawl web search). */
+    FIRECRAWL_API_KEY: v.optional(v.string()),
   },
 });
