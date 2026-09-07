@@ -30,6 +30,9 @@ import type { DataModel } from "./dataModel.js";
 type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
+  readonly AGENTMAIL_API_KEY: string | undefined;
+  readonly AGENTMAIL_INBOX_ID: string | undefined;
+  readonly AGENTMAIL_WEBHOOK_SECRET: string | undefined;
   readonly EBAY_CATEGORY_ID: string | undefined;
   readonly EBAY_CLIENT_ID: string | undefined;
   readonly EBAY_CLIENT_SECRET: string | undefined;
@@ -47,6 +50,7 @@ type Env = {
   readonly OPENAI_REASONING_EFFORT: string | undefined;
   readonly OPENAI_VISION_MODEL: string | undefined;
   readonly SEGMENTATION_MODE: string | undefined;
+  readonly USER_NOTIFY_EMAIL: string | undefined;
 };
 
 /**

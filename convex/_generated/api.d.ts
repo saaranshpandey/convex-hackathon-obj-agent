@@ -9,6 +9,10 @@
  */
 
 import type * as activity from "../activity.js";
+import type * as agentMail from "../agentMail.js";
+import type * as agentMail_client from "../agentMail/client.js";
+import type * as agentMail_parseReply from "../agentMail/parseReply.js";
+import type * as agentMail_verify from "../agentMail/verify.js";
 import type * as cleanouts from "../cleanouts.js";
 import type * as detection from "../detection.js";
 import type * as dev from "../dev.js";
@@ -42,6 +46,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activity: typeof activity;
+  agentMail: typeof agentMail;
+  "agentMail/client": typeof agentMail_client;
+  "agentMail/parseReply": typeof agentMail_parseReply;
+  "agentMail/verify": typeof agentMail_verify;
   cleanouts: typeof cleanouts;
   detection: typeof detection;
   dev: typeof dev;
