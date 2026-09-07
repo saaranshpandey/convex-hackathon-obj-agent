@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" role="img" aria-label="Illustrated room containing a guitar, a games console, a monitor on a desk, an office chair and a printer">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0%" stop-color="#F2F1EA"/>
+      <stop offset="100%" stop-color="#E6E4DA"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#DCD6C7"/>
+      <stop offset="100%" stop-color="#CFC8B6"/>
+    </linearGradient>
+    <linearGradient id="daylight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C9A87C"/>
+      <stop offset="100%" stop-color="#B08F63"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="#2C3138"/>
+      <stop offset="100%" stop-color="#16181C"/>
+    </linearGradient>
+    <linearGradient id="spruce" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#E3B472"/>
+      <stop offset="100%" stop-color="#CE9750"/>
+    </linearGradient>
+    <radialGradient id="drop" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#6B6350" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#6B6350" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- room -->
+  <rect width="1600" height="1000" fill="url(#wall)"/>
+  <rect y="640" width="1600" height="360" fill="url(#floor)"/>
+  <rect y="632" width="1600" height="10" fill="#C6BEA9"/>
+  <rect x="980" y="70" width="470" height="330" rx="10" fill="url(#daylight)"/>
+
+  <!-- desk -->
+  <ellipse cx="865" cy="944" rx="360" ry="26" fill="url(#drop)"/>
+  <rect x="530" y="596" width="670" height="26" rx="5" fill="url(#wood)"/>
+  <rect x="556" y="622" width="22" height="318" rx="5" fill="#A8875C"/>
+  <rect x="1152" y="622" width="22" height="318" rx="5" fill="#A8875C"/>
+
+  <!-- guitar -->
+  <ellipse cx="200" cy="942" rx="130" ry="20" fill="url(#drop)"/>
+  <rect x="182" y="420" width="36" height="292" rx="6" fill="#7E5533"/>
+  <rect x="172" y="386" width="56" height="52" rx="12" fill="#6A452A"/>
+  <ellipse cx="200" cy="705" rx="82" ry="74" fill="url(#spruce)"/>
+  <ellipse cx="200" cy="842" rx="105" ry="97" fill="url(#spruce)"/>
+  <rect x="132" y="700" width="136" height="120" fill="url(#spruce)"/>
+  <circle cx="200" cy="768" r="31" fill="#5E3E24"/>
+  <rect x="176" y="880" width="48" height="15" rx="4" fill="#6A452A"/>
+  <g stroke="#F3E4C8" stroke-width="2" opacity="0.7">
+    <path d="M188 438 V884"/><path d="M196 438 V884"/><path d="M204 438 V884"/><path d="M212 438 V884"/>
+  </g>
+
+  <!-- games console -->
+  <ellipse cx="436" cy="948" rx="86" ry="16" fill="url(#drop)"/>
+  <path d="M386 620 H486 L494 632 V934 L486 946 H386 L378 934 V632 Z" fill="#FAFAF7"/>
+  <rect x="408" y="630" width="56" height="306" fill="#26262A"/>
+  <rect x="416" y="866" width="40" height="4" rx="2" fill="#5D6C7E"/>
+
+  <!-- monitor -->
+  <rect x="730" y="344" width="320" height="212" rx="12" fill="#2A2A28"/>
+  <rect x="742" y="356" width="296" height="180" rx="6" fill="url(#screen)"/>
+  <rect x="874" y="556" width="30" height="26" fill="#3A3A37"/>
+  <rect x="822" y="582" width="136" height="14" rx="7" fill="#3A3A37"/>
+
+  <!-- office chair -->
+  <ellipse cx="1056" cy="994" rx="150" ry="18" fill="url(#drop)"/>
+  <rect x="956" y="590" width="200" height="196" rx="28" fill="#3C3B38"/>
+  <rect x="976" y="614" width="160" height="148" rx="20" fill="#4A4945"/>
+  <rect x="918" y="798" width="276" height="56" rx="22" fill="#3C3B38"/>
+  <rect x="1032" y="854" width="48" height="96" rx="8" fill="#A9A8A2"/>
+  <g stroke="#A9A8A2" stroke-width="18" stroke-linecap="round" fill="none">
+    <path d="M1056 950 L952 994"/>
+    <path d="M1056 950 L1160 994"/>
+  </g>
+
+  <!-- printer -->
+  <ellipse cx="1409" cy="948" rx="150" ry="18" fill="url(#drop)"/>
+  <rect x="1290" y="760" width="238" height="34" rx="9" fill="#3A3A37"/>
+  <path d="M1276 792 H1546 V934 L1526 948 H1292 L1272 934 Z" fill="#E6E5DF"/>
+  <rect x="1300" y="874" width="200" height="16" rx="6" fill="#CFCEC6"/>
+  <rect x="1300" y="812" width="58" height="20" rx="6" fill="#3A3A37"/>
+  <circle cx="1508" cy="822" r="7" fill="#B8F35A"/>
+</svg>
