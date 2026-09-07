@@ -33,6 +33,8 @@ type Env = {
   readonly AGENTMAIL_API_KEY: string | undefined;
   readonly AGENTMAIL_INBOX_ID: string | undefined;
   readonly AGENTMAIL_WEBHOOK_SECRET: string | undefined;
+  readonly DEMO_MODE: string | undefined;
+  readonly EBAY_ACTIVITY_MODE: string | undefined;
   readonly EBAY_CATEGORY_ID: string | undefined;
   readonly EBAY_CLIENT_ID: string | undefined;
   readonly EBAY_CLIENT_SECRET: string | undefined;

@@ -8,20 +8,13 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { env } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { pendingDecisionKind, pendingDecisionValidator } from "./schema";
 import { getOrCreateInbox, sendMessage } from "./agentMail/client";
 import { parseReply, type ParsedAction } from "./agentMail/parseReply";
+import { isValidAmount } from "./money";
 
 const CONFIDENCE_THRESHOLD = 0.6;
-/** A sanity ceiling, not a business rule — just enough to reject a corrupted
- * or adversarial value (NaN, Infinity, or an absurd magnitude) before it's
- * ever written to a listing's price. */
-const MAX_REASONABLE_AMOUNT = 1_000_000;
-
-function isValidAmount(value: number | undefined): value is number {
-  return value !== undefined && Number.isFinite(value) && value > 0 && value <= MAX_REASONABLE_AMOUNT;
-}
 
 type PendingDecision = Infer<typeof pendingDecisionValidator>;
 
@@ -36,32 +29,12 @@ export const messagesForListing = query({
   },
 });
 
-/** Dev-only trigger — there's no real eBay Best-Offer integration to source
- * a genuine buyer offer from, so this simulates one for the demo. */
-export const sendTestOffer = mutation({
-  args: { listingId: v.id("listings"), amount: v.number() },
-  handler: async (ctx, args) => {
-    const listing = await ctx.db.get("listings", args.listingId);
-    if (listing === null) throw new Error("Listing not found");
-    if (listing.status !== "live") throw new Error("Only a live listing can receive an offer");
-    if (!isValidAmount(args.amount)) {
-      throw new Error(`Offer amount must be a valid amount between $0 and $${MAX_REASONABLE_AMOUNT}`);
-    }
-
-    await ctx.db.patch("listings", args.listingId, {
-      pendingDecision: { kind: "offer", amount: args.amount, createdAt: Date.now() },
-    });
-
-    await ctx.scheduler.runAfter(0, internal.agentMail.sendDecisionEmail, {
-      listingId: args.listingId,
-      kind: "offer",
-      amount: args.amount,
-    });
-
-    return null;
-  },
-});
-
+/**
+ * Simulated buyer offers now live in `offers.simulateBuyerOffer`, so that a
+ * demo offer creates a real offer row and travels the same path a marketplace
+ * offer will. Price-drop suggestions have no offer behind them, so they stay
+ * here.
+ */
 export const sendTestPriceDropSuggestion = mutation({
   args: { listingId: v.id("listings"), suggestedPrice: v.number() },
   handler: async (ctx, args) => {
@@ -101,6 +74,7 @@ export const contextForListing = internalQuery({
 export const recordOutbound = internalMutation({
   args: {
     listingId: v.id("listings"),
+    offerId: v.optional(v.id("offers")),
     kind: v.union(
       v.literal("offer_notice"),
       v.literal("price_drop_suggestion"),
@@ -115,6 +89,7 @@ export const recordOutbound = internalMutation({
   handler: async (ctx, args) => {
     await ctx.db.insert("agentMessages", {
       listingId: args.listingId,
+      offerId: args.offerId,
       direction: "outbound",
       kind: args.kind,
       text: args.text,
@@ -132,6 +107,7 @@ export const sendDecisionEmail = internalAction({
     listingId: v.id("listings"),
     kind: pendingDecisionKind,
     amount: v.number(),
+    offerId: v.optional(v.id("offers")),
   },
   handler: async (ctx, args) => {
     const context: { listing: Doc<"listings">; itemName: string } | null = await ctx.runQuery(
@@ -152,9 +128,18 @@ export const sendDecisionEmail = internalAction({
         ? `Your ${itemName} has a $${args.amount} offer`
         : `Your ${itemName} hasn't sold yet`;
 
+    // Suggest a counter between the offer and the asking price. Echoing the
+    // offer amount back (as this once did) suggests countering at exactly what
+    // the buyer already offered, which is just accepting.
+    const midpoint = Math.round((args.amount + listing.price) / 2);
+    const suggestedCounter = Math.min(
+      Math.max(midpoint, args.amount + 1),
+      Math.max(listing.price - 1, args.amount + 1),
+    );
+
     const text =
       args.kind === "offer"
-        ? `Your ${itemName} is listed at $${listing.price}.\n\nA buyer offered $${args.amount}.\n\nReply with:\nACCEPT\nCOUNTER ${args.amount}\nDECLINE`
+        ? `Your ${itemName} is listed at $${listing.price}.\n\nA buyer offered $${args.amount}.\n\nReply ACCEPT, DECLINE, or COUNTER ${suggestedCounter}`
         : `Your ${itemName} has had no interest for 5 days.\nI recommend lowering $${listing.price} → $${args.amount}.\nReply YES or KEEP.`;
 
     const inbox = await getOrCreateInbox(apiKey, env.AGENTMAIL_INBOX_ID?.trim());
@@ -162,6 +147,7 @@ export const sendDecisionEmail = internalAction({
 
     await ctx.runMutation(internal.agentMail.recordOutbound, {
       listingId: args.listingId,
+      offerId: args.offerId,
       kind: args.kind === "offer" ? "offer_notice" : "price_drop_suggestion",
       text,
       amount: args.amount,
@@ -180,171 +166,204 @@ export const findListingByThread = internalQuery({
       .query("agentMessages")
       .withIndex("by_agentMailMessageId", (q) => q.eq("agentMailMessageId", args.messageId))
       .unique();
-    if (existing !== null) return { duplicate: true as const, listing: null };
+    if (existing !== null) return { duplicate: true as const, listing: null, offerId: null };
 
     const priorMessage = await ctx.db
       .query("agentMessages")
       .withIndex("by_agentMailThreadId", (q) => q.eq("agentMailThreadId", args.threadId))
       .order("desc")
       .first();
-    if (priorMessage === null) return { duplicate: false as const, listing: null };
+    if (priorMessage === null) {
+      return { duplicate: false as const, listing: null, offerId: null };
+    }
+
+    // The offer this thread is about. Walk back through the thread if the most
+    // recent message didn't carry one (e.g. a clarification).
+    let offerId = priorMessage.offerId ?? null;
+    if (offerId === null) {
+      const thread = await ctx.db
+        .query("agentMessages")
+        .withIndex("by_agentMailThreadId", (q) =>
+          q.eq("agentMailThreadId", args.threadId),
+        )
+        .order("desc")
+        .take(20);
+      offerId = thread.find((m) => m.offerId !== undefined)?.offerId ?? null;
+    }
 
     const listing = await ctx.db.get("listings", priorMessage.listingId);
-    return { duplicate: false as const, listing };
+    return { duplicate: false as const, listing, offerId };
   },
 });
 
-const parsedActionValidator = v.object({
-  action: v.union(
-    v.literal("accept"),
-    v.literal("decline"),
-    v.literal("counter"),
-    v.literal("approve_price_change"),
-    v.literal("unknown"),
-  ),
-  amount: v.optional(v.number()),
-  confidence: v.number(),
-});
-
-export const recordInboundAndResolve = internalMutation({
+/**
+ * Records the owner's reply.
+ *
+ * The duplicate re-check matters: `findListingByThread` reads in a separate
+ * transaction, so two concurrent redeliveries of the same webhook could both
+ * pass it. This insert is the atomic guard that makes redelivery safe.
+ */
+export const recordInboundMessage = internalMutation({
   args: {
     listingId: v.id("listings"),
     text: v.string(),
     agentMailMessageId: v.string(),
     agentMailThreadId: v.string(),
-    parsed: parsedActionValidator,
+    amount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("agentMessages")
+      .withIndex("by_agentMailMessageId", (q) =>
+        q.eq("agentMailMessageId", args.agentMailMessageId),
+      )
+      .first();
+    if (existing !== null) return { duplicate: true as const };
+
     await ctx.db.insert("agentMessages", {
       listingId: args.listingId,
       direction: "inbound",
       kind: "reply",
       text: args.text,
-      amount: args.parsed.amount,
+      amount: args.amount,
       agentMailMessageId: args.agentMailMessageId,
       agentMailThreadId: args.agentMailThreadId,
       createdAt: Date.now(),
     });
 
+    return { duplicate: false as const };
+  },
+});
+
+/**
+ * Price-drop suggestions only. Offers go through `offers.applyDecision` — the
+ * same path the web UI uses — so there is exactly one place that resolves them.
+ */
+export const resolvePriceDrop = internalMutation({
+  args: {
+    listingId: v.id("listings"),
+    approve: v.boolean(),
+    agentMailThreadId: v.string(),
+  },
+  handler: async (ctx, args) => {
     const listing = await ctx.db.get("listings", args.listingId);
-    if (listing === null || listing.pendingDecision === undefined) {
-      return { outcome: "no_pending" as const };
-    }
+    if (listing === null) return { resolved: false as const };
 
     const pending = listing.pendingDecision;
-    const { action, amount, confidence } = args.parsed;
-
-    const kindMatches =
-      action === "accept" || action === "counter"
-        ? pending.kind === "offer"
-        : action === "approve_price_change"
-          ? pending.kind === "price_drop"
-          : action === "decline";
-
-    const counterAmountValid = action !== "counter" || isValidAmount(amount);
-
-    if (
-      action === "unknown" ||
-      confidence < CONFIDENCE_THRESHOLD ||
-      !kindMatches ||
-      !counterAmountValid
-    ) {
-      return { outcome: "clarify" as const, pending };
+    if (pending === undefined || pending.kind !== "price_drop") {
+      return { resolved: false as const };
     }
 
-    let confirmationText: string;
+    const text = args.approve
+      ? `Price updated to $${pending.amount}.`
+      : `Kept the price at $${listing.price}.`;
 
-    if (action === "accept") {
-      await ctx.db.patch("listings", args.listingId, {
-        status: "sold",
-        price: pending.amount,
-        pendingDecision: undefined,
-      });
-      confirmationText = `Accepted. Marked sold at $${pending.amount}.`;
-    } else if (action === "decline" && pending.kind === "offer") {
-      await ctx.db.patch("listings", args.listingId, { pendingDecision: undefined });
-      confirmationText = `Offer declined. Staying live at $${listing.price}.`;
-    } else if (action === "decline") {
-      await ctx.db.patch("listings", args.listingId, { pendingDecision: undefined });
-      confirmationText = `Kept the price at $${listing.price}.`;
-    } else if (action === "counter" && isValidAmount(amount)) {
-      await ctx.db.patch("listings", args.listingId, { price: amount, pendingDecision: undefined });
-      confirmationText = `Counter submitted at $${amount}.`;
-    } else if (action === "approve_price_change") {
-      await ctx.db.patch("listings", args.listingId, {
-        price: pending.amount,
-        pendingDecision: undefined,
-      });
-      confirmationText = `Price updated to $${pending.amount}.`;
-    } else {
-      return { outcome: "clarify" as const, pending };
-    }
+    await ctx.db.patch("listings", args.listingId, {
+      price: args.approve ? pending.amount : listing.price,
+      pendingDecision: undefined,
+    });
 
     await ctx.db.insert("agentMessages", {
       listingId: args.listingId,
       direction: "outbound",
       kind: "confirmation",
-      text: confirmationText,
+      text,
       agentMailThreadId: args.agentMailThreadId,
       createdAt: Date.now(),
     });
 
-    return { outcome: "resolved" as const };
+    return { resolved: true as const };
   },
 });
 
 export const handleInboundReply = internalAction({
   args: { messageId: v.string(), threadId: v.string(), text: v.string() },
   handler: async (ctx, args) => {
-    const lookup: { duplicate: boolean; listing: Doc<"listings"> | null } = await ctx.runQuery(
-      internal.agentMail.findListingByThread,
-      { threadId: args.threadId, messageId: args.messageId },
-    );
+    const lookup: {
+      duplicate: boolean;
+      listing: Doc<"listings"> | null;
+      offerId: Id<"offers"> | null;
+    } = await ctx.runQuery(internal.agentMail.findListingByThread, {
+      threadId: args.threadId,
+      messageId: args.messageId,
+    });
 
     if (lookup.duplicate) return null;
     if (lookup.listing === null) return null;
 
     const listing = lookup.listing;
-
-    if (listing.pendingDecision === undefined) {
-      await ctx.runMutation(internal.agentMail.recordInboundAndResolve, {
-        listingId: listing._id,
-        text: args.text,
-        agentMailMessageId: args.messageId,
-        agentMailThreadId: args.threadId,
-        parsed: { action: "unknown", confidence: 0 },
-      });
-      return null;
-    }
+    const pending: PendingDecision | undefined = listing.pendingDecision;
 
     const openaiKey = env.OPENAI_API_KEY?.trim();
-    let parsed: ParsedAction;
-    if (!openaiKey) {
-      parsed = { action: "unknown", confidence: 0 };
-    } else {
+    let parsed: ParsedAction = { action: "unknown", confidence: 0 };
+    if (pending !== undefined && openaiKey) {
       try {
         parsed = await parseReply({
           apiKey: openaiKey,
           replyText: args.text,
-          pendingDecision: listing.pendingDecision,
+          pendingDecision: pending,
         });
       } catch {
         parsed = { action: "unknown", confidence: 0 };
       }
     }
 
-    const result: { outcome: "no_pending" } | { outcome: "clarify"; pending: PendingDecision } | { outcome: "resolved" } =
-      await ctx.runMutation(internal.agentMail.recordInboundAndResolve, {
+    const record: { duplicate: boolean } = await ctx.runMutation(
+      internal.agentMail.recordInboundMessage,
+      {
         listingId: listing._id,
         text: args.text,
         agentMailMessageId: args.messageId,
         agentMailThreadId: args.threadId,
-        parsed,
-      });
+        amount: parsed.amount,
+      },
+    );
+    // Lost the race against a concurrent redelivery; that one is handling it.
+    if (record.duplicate) return null;
 
-    if (result.outcome === "clarify") {
+    // Nothing was asked, so there is nothing to act on — the reply is logged.
+    if (pending === undefined) return null;
+
+    const { action, amount, confidence } = parsed;
+    const confident = action !== "unknown" && confidence >= CONFIDENCE_THRESHOLD;
+
+    let resolved = false;
+
+    if (confident && pending.kind === "offer") {
+      const counterValid = action !== "counter" || isValidAmount(amount);
+      if (counterValid && (action === "accept" || action === "decline" || action === "counter")) {
+        // Resolve the offer this thread is actually about. Falling back to
+        // "newest pending offer" would let a reply to an older email settle a
+        // different, newer offer.
+        const targetOfferId = lookup.offerId ?? pending.offerId ?? null;
+        if (targetOfferId !== null) {
+          // The same call the web UI's buttons make.
+          const outcome: { ok: boolean; reason?: string } = await ctx.runAction(
+            internal.offers.applyDecision,
+            { offerId: targetOfferId, action, amount },
+          );
+          resolved = outcome.ok;
+        }
+      }
+    } else if (
+      confident &&
+      pending.kind === "price_drop" &&
+      (action === "approve_price_change" || action === "decline")
+    ) {
+      const outcome: { resolved: boolean } = await ctx.runMutation(
+        internal.agentMail.resolvePriceDrop,
+        {
+          listingId: listing._id,
+          approve: action === "approve_price_change",
+          agentMailThreadId: args.threadId,
+        },
+      );
+      resolved = outcome.resolved;
+    }
+
+    if (!resolved) {
       const clarificationText =
-        result.pending.kind === "offer"
+        pending.kind === "offer"
           ? "I didn't quite catch that — reply with ACCEPT, COUNTER <amount>, or DECLINE."
           : "I didn't quite catch that — reply YES or KEEP.";
 

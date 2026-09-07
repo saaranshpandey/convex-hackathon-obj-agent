@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GetItemResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Success</Ack>
+  <Item>
+    <ItemID>110012345678</ItemID>
+    <SellingStatus>
+      <CurrentPrice currencyID="USD">260.0</CurrentPrice>
+      <QuantitySold>1</QuantitySold>
+      <ListingStatus>Completed</ListingStatus>
+    </SellingStatus>
+  </Item>
+</GetItemResponse>

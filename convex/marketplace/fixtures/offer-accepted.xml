@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GetBestOffersResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Success</Ack>
+  <Version>1451</Version>
+  <BestOfferArray>
+    <BestOffer>
+      <BestOfferID>1122334455</BestOfferID>
+      <Price currencyID="USD">245.0</Price>
+      <Status>Accepted</Status>
+    </BestOffer>
+  </BestOfferArray>
+</GetBestOffersResponse>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GetBestOffersResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Timestamp>2026-09-07T18:04:11.000Z</Timestamp>
+  <Ack>Success</Ack>
+  <Version>1451</Version>
+  <BestOfferArray>
+    <BestOffer>
+      <BestOfferID>1122334455</BestOfferID>
+      <Buyer><UserID>testbuyer_01</UserID></Buyer>
+      <Price currencyID="USD">245.0</Price>
+      <Quantity>1</Quantity>
+      <Status>Pending</Status>
+      <BuyerMessage>Would you take 245?</BuyerMessage>
+      <ExpirationTime>2026-09-09T18:04:11.000Z</ExpirationTime>
+    </BestOffer>
+  </BestOfferArray>
+</GetBestOffersResponse>

@@ -1,16 +1,19 @@
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
+import OfferCard from "@/components/OfferCard";
 
 export default function AgentTab({ listing }: { listing: Doc<"listings"> }) {
   const messages = useQuery(api.agentMail.messagesForListing, { listingId: listing._id });
-  const sendTestOffer = useMutation(api.agentMail.sendTestOffer);
+  const simulateBuyerOffer = useMutation(api.offers.simulateBuyerOffer);
   const sendTestPriceDropSuggestion = useMutation(api.agentMail.sendTestPriceDropSuggestion);
 
   return (
     <div className="mt-4">
+      <OfferCard listing={listing} />
+
       {listing.pendingDecision && (
-        <div className="mb-3 rounded-lg bg-canvas px-3 py-2 text-xs text-muted">
+        <div className="mt-3 mb-3 rounded-lg bg-canvas px-3 py-2 text-xs text-muted">
           Waiting for your reply via email…
         </div>
       )}
@@ -57,7 +60,7 @@ export default function AgentTab({ listing }: { listing: Doc<"listings"> }) {
               );
               const amount = value ? Number(value) : NaN;
               if (Number.isFinite(amount) && amount > 0) {
-                void sendTestOffer({ listingId: listing._id, amount });
+                void simulateBuyerOffer({ listingId: listing._id, amount });
               }
             }}
             disabled={listing.status !== "live"}

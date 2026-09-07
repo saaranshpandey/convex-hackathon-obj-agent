@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GetBestOffersResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Timestamp>2026-09-07T18:04:11.000Z</Timestamp>
+  <Ack>Failure</Ack>
+  <Errors>
+    <ShortMessage>Invalid item ID.</ShortMessage>
+    <LongMessage>The item ID 999 is not valid or does not belong to this seller.</LongMessage>
+    <ErrorCode>17</ErrorCode>
+    <SeverityCode>Error</SeverityCode>
+  </Errors>
+  <Version>1451</Version>
+</GetBestOffersResponse>

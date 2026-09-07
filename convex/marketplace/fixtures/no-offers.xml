@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GetBestOffersResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Timestamp>2026-09-07T18:04:11.000Z</Timestamp>
+  <Ack>Success</Ack>
+  <Version>1451</Version>
+  <BestOfferArray/>
+</GetBestOffersResponse>

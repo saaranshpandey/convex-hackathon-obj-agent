@@ -23,6 +23,14 @@ export default defineApp({
 
     /** "mock" | "sandbox". Defaults to "mock" if unset — the demo always works. */
     EBAY_MODE: v.optional(v.string()),
+    /** "mock" | "ebay". Source of offer activity; independent of EBAY_MODE. */
+    EBAY_ACTIVITY_MODE: v.optional(v.string()),
+    /**
+     * Must be exactly "true" for the demo simulators (fabricating buyer offers
+     * and acceptances) to run. Hiding the buttons in the client is not a
+     * control — these mutations ship in every build.
+     */
+    DEMO_MODE: v.optional(v.string()),
     EBAY_CLIENT_ID: v.optional(v.string()),
     EBAY_CLIENT_SECRET: v.optional(v.string()),
     /** eBay's opaque OAuth redirect identifier for this app + environment — not a URL. */

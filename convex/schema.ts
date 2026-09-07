@@ -89,6 +89,17 @@ export const listingCondition = v.union(
   v.literal("poor"),
 );
 
+export const offerStatus = v.union(
+  v.literal("pending"),
+  v.literal("accepted"),
+  v.literal("declined"),
+  v.literal("countered"),
+  v.literal("buyer_accepted"),
+  v.literal("expired"),
+);
+
+export const offerSource = v.union(v.literal("mock"), v.literal("ebay"));
+
 export const agentMessageDirection = v.union(v.literal("outbound"), v.literal("inbound"));
 
 export const agentMessageKind = v.union(
@@ -104,6 +115,12 @@ export const pendingDecisionKind = v.union(v.literal("offer"), v.literal("price_
 export const pendingDecisionValidator = v.object({
   kind: pendingDecisionKind,
   amount: v.number(),
+  /**
+   * Which offer this decision is about. Always set for kind "offer"; absent for
+   * price drops, which have no offer behind them. Optional in the validator
+   * only so rows written before this field existed still validate.
+   */
+  offerId: v.optional(v.id("offers")),
   createdAt: v.number(),
 });
 
@@ -215,6 +232,23 @@ export default defineSchema({
     .index("by_cleanoutId", ["cleanoutId"])
     .index("by_itemId", ["itemId"]),
 
+  offers: defineTable({
+    listingId: v.id("listings"),
+    /** The marketplace's own id — the idempotency key for ingestion. */
+    marketplaceOfferId: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    status: offerStatus,
+    source: offerSource,
+    /** Set once the owner counters, so the UI can show both figures. */
+    counterAmount: v.optional(v.number()),
+    buyerMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_listingId_and_createdAt", ["listingId", "createdAt"])
+    .index("by_marketplaceOfferId", ["marketplaceOfferId"]),
+
   ebayConnections: defineTable({
     sessionId: v.string(),
     accessToken: v.string(),
@@ -229,6 +263,12 @@ export default defineSchema({
 
   agentMessages: defineTable({
     listingId: v.id("listings"),
+    /**
+     * The offer this message is about. Carried on the outbound notice so an
+     * inbound reply resolves the offer that was actually asked about, rather
+     * than whichever offer happens to be newest.
+     */
+    offerId: v.optional(v.id("offers")),
     direction: agentMessageDirection,
     kind: agentMessageKind,
     text: v.string(),

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RespondToBestOfferResponse xmlns="urn:ebay:apis:eBLBaseComponents">
+  <Ack>Success</Ack>
+  <Version>1451</Version>
+</RespondToBestOfferResponse>

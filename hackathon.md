@@ -12,7 +12,7 @@
 - **Auth:** none
 - **AI models:** gpt-5.6-luna, fal-ai/sam2/image
 - **Started:** 2026-09-07T05:06:14Z
-- **Last updated:** 2026-09-07T17:20:49Z
+- **Last updated:** 2026-09-07T22:34:36Z
 
 ## Log
 
@@ -87,3 +87,17 @@ real sandbox publishing is pending eBay developer credentials
 (`convex/ebay/`, `convex/http.ts`, `convex/ebayAuth.ts`,
 `convex/listingPublish.ts`, `src/components/EbayConnectButton.tsx`,
 `src/components/ListingDrawer.tsx`).
+
+### 2026-09-07 - 9e6c877
+Added Phase 7: the selling agent talks to the item's owner by email, and only
+when it needs a decision. One AgentMail inbox sends a message for a meaningful
+event — an offer worth approving, or a stale listing worth repricing — and the
+owner just replies. Inbound replies arrive through a Svix-signed webhook,
+get parsed by OpenAI structured outputs into a constrained action
+(accept / decline / counter / approve_price_change / unknown, with a confidence
+score), and only execute when the model is confident AND the action matches the
+question that was actually asked; anything else gets a clarification email
+rather than a guess. Each listing's drawer gained an Agent tab that reads as a
+conversation instead of raw email. Convex features: HTTP actions, scheduled
+functions, actions, mutations, queries, indexes (`convex/agentMail.ts`,
+`convex/agentMail/`, `convex/http.ts`, `src/components/AgentTab.tsx`).
