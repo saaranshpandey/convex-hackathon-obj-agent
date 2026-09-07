@@ -89,6 +89,24 @@ export const listingCondition = v.union(
   v.literal("poor"),
 );
 
+export const agentMessageDirection = v.union(v.literal("outbound"), v.literal("inbound"));
+
+export const agentMessageKind = v.union(
+  v.literal("offer_notice"),
+  v.literal("price_drop_suggestion"),
+  v.literal("reply"),
+  v.literal("confirmation"),
+  v.literal("clarification"),
+);
+
+export const pendingDecisionKind = v.union(v.literal("offer"), v.literal("price_drop"));
+
+export const pendingDecisionValidator = v.object({
+  kind: pendingDecisionKind,
+  amount: v.number(),
+  createdAt: v.number(),
+});
+
 export const activityType = v.union(
   v.literal("cleanout_created"),
   v.literal("detection_started"),
@@ -190,6 +208,9 @@ export default defineSchema({
     publishError: v.optional(v.string()),
     /** "mock" | "sandbox" — which mode actually produced this result. */
     publishMode: v.optional(v.string()),
+
+    // Phase 7: the one open question the owner needs to answer, if any.
+    pendingDecision: v.optional(pendingDecisionValidator),
   })
     .index("by_cleanoutId", ["cleanoutId"])
     .index("by_itemId", ["itemId"]),
@@ -205,4 +226,18 @@ export default defineSchema({
     connectedAt: v.number(),
     updatedAt: v.number(),
   }).index("by_sessionId", ["sessionId"]),
+
+  agentMessages: defineTable({
+    listingId: v.id("listings"),
+    direction: agentMessageDirection,
+    kind: agentMessageKind,
+    text: v.string(),
+    amount: v.optional(v.number()),
+    agentMailMessageId: v.optional(v.string()),
+    agentMailThreadId: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_listingId_and_createdAt", ["listingId", "createdAt"])
+    .index("by_agentMailThreadId", ["agentMailThreadId"])
+    .index("by_agentMailMessageId", ["agentMailMessageId"]),
 });

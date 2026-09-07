@@ -32,5 +32,11 @@ export default defineApp({
     EBAY_PAYMENT_POLICY_ID: v.optional(v.string()),
     EBAY_RETURN_POLICY_ID: v.optional(v.string()),
     EBAY_CATEGORY_ID: v.optional(v.string()),
+
+    /** Owner communication (never the eBay buyer-messaging channel). */
+    AGENTMAIL_API_KEY: v.optional(v.string()),
+    AGENTMAIL_WEBHOOK_SECRET: v.optional(v.string()),
+    /** The single demo owner's real address — this app has no per-user email. */
+    USER_NOTIFY_EMAIL: v.optional(v.string()),
   },
 });
