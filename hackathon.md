@@ -8,11 +8,11 @@
 - **Frontend:** Convex static hosting
 - **Convex deployment:** not deployed
 - **Components:** none
-- **Convex features:** schema, tables, indexes, queries, mutations, actions, internal functions, scheduled functions, file storage, realtime queries
+- **Convex features:** schema, tables, indexes, queries, mutations, actions, internal functions, scheduled functions, HTTP actions, file storage, realtime queries
 - **Auth:** none
 - **AI models:** gpt-5.6-luna, fal-ai/sam2/image
 - **Started:** 2026-09-07T05:06:14Z
-- **Last updated:** 2026-09-07T07:42:32Z
+- **Last updated:** 2026-09-07T17:20:49Z
 
 ## Log
 
@@ -51,3 +51,39 @@ and the detail panel shows the full pricing breakdown. Verified against real
 OpenAI and Firecrawl calls across three item categories (`convex/research.ts`,
 `convex/identify.ts`, `convex/priceResearch.ts`,
 `src/components/ResearchStatusBar.tsx`, `src/components/DetailPanel.tsx`).
+
+### 2026-09-07 - 6e76b2e
+Added Phase 5: listing generation. Once an item's research completes, one
+more automatic stage drafts a marketplace-ready listing — title, description,
+category, condition, price — grounded strictly in the identification and
+pricing already computed, never inventing a spec the earlier stages didn't
+establish. The right panel becomes a "Ready to sell" card list once drafts
+exist; clicking Review opens a new overlay drawer (image crop, editable
+title/price/condition/description, a collapsed research summary) with Save
+and Approve actions and Next/Previous to step through every draft, plus a
+fixed bottom bar showing how many listings are ready. Verified against real
+OpenAI calls: generated prices matched what Phase 4 had already computed,
+and update/approve/bulk actions all persisted correctly with unapproved
+drafts left untouched (`convex/generateListing.ts`, `convex/listings.ts`,
+`src/components/ReadyToSell.tsx`, `src/components/ListingDrawer.tsx`,
+`src/components/ListingsBar.tsx`).
+
+### 2026-09-07 - 23b62b0
+Added Phase 6: eBay integration. Users connect a real eBay account through
+OAuth — no password is ever collected, only an authorization code and
+refreshable tokens — via a popup window and a Convex HTTP endpoint that
+receives the callback, so the main tab never navigates away. A mock mode
+simulates the same connect-and-publish flow with zero external calls, so the
+demo works without eBay sandbox access. Approving a listing and publishing
+now creates a real eBay Sell Inventory listing (inventory item → offer →
+publish); the mutation claims the job by flipping status inside a
+transaction before the eBay call runs, so duplicate clicks can never create
+duplicate listings, and failures surface a human-readable message with a
+retry action. Cards show the full lifecycle (Ready → Approved → Publishing →
+Live on eBay, or Failed) with a direct link to the live listing. Verified
+end-to-end in mock mode — connect, publish, duplicate-click rejection,
+failed-then-retry, disconnect — plus the sandbox misconfiguration error path;
+real sandbox publishing is pending eBay developer credentials
+(`convex/ebay/`, `convex/http.ts`, `convex/ebayAuth.ts`,
+`convex/listingPublish.ts`, `src/components/EbayConnectButton.tsx`,
+`src/components/ListingDrawer.tsx`).

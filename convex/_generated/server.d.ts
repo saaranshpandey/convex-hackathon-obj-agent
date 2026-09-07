@@ -30,6 +30,15 @@ import type { DataModel } from "./dataModel.js";
 type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
+  readonly EBAY_CATEGORY_ID: string | undefined;
+  readonly EBAY_CLIENT_ID: string | undefined;
+  readonly EBAY_CLIENT_SECRET: string | undefined;
+  readonly EBAY_FULFILLMENT_POLICY_ID: string | undefined;
+  readonly EBAY_MERCHANT_LOCATION_KEY: string | undefined;
+  readonly EBAY_MODE: string | undefined;
+  readonly EBAY_PAYMENT_POLICY_ID: string | undefined;
+  readonly EBAY_RETURN_POLICY_ID: string | undefined;
+  readonly EBAY_RU_NAME: string | undefined;
   readonly FAL_KEY: string | undefined;
   readonly FAL_MASK_MODEL: string | undefined;
   readonly FIRECRAWL_API_KEY: string | undefined;
