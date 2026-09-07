@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { env } from "./_generated/server";
 import { exchangeCodeForTokens } from "./ebay/oauth";
+import { verifySvixSignature } from "./agentMail/verify";
 
 const http = httpRouter();
 
@@ -72,6 +73,62 @@ http.route({
     } catch (error) {
       return page(false, error instanceof Error ? error.message : "Connection failed.");
     }
+  }),
+});
+
+http.route({
+  path: "/agentmail/webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const bodyText = await req.text();
+
+    const secret = env.AGENTMAIL_WEBHOOK_SECRET?.trim();
+    const svixId = req.headers.get("svix-id");
+    const svixTimestamp = req.headers.get("svix-timestamp");
+    const svixSignature = req.headers.get("svix-signature");
+
+    if (!secret || !svixId || !svixTimestamp || !svixSignature) {
+      return new Response("Missing signature", { status: 400 });
+    }
+
+    const valid = await verifySvixSignature({
+      secret,
+      svixId,
+      svixTimestamp,
+      svixSignature,
+      body: bodyText,
+    });
+    if (!valid) return new Response("Invalid signature", { status: 401 });
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(bodyText);
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    const body = payload as Record<string, unknown>;
+    if (body.event_type !== "message.received") {
+      return new Response("ignored", { status: 200 });
+    }
+
+    const message = body.message as Record<string, unknown> | undefined;
+    const messageId = typeof message?.message_id === "string" ? message.message_id : null;
+    const threadId = typeof message?.thread_id === "string" ? message.thread_id : null;
+    const text =
+      typeof message?.text === "string"
+        ? message.text
+        : typeof message?.extracted_text === "string"
+          ? message.extracted_text
+          : null;
+
+    if (!messageId || !threadId || text === null) {
+      return new Response("ignored", { status: 200 });
+    }
+
+    await ctx.runAction(internal.agentMail.handleInboundReply, { messageId, threadId, text });
+
+    return new Response("ok", { status: 200 });
   }),
 });
 
