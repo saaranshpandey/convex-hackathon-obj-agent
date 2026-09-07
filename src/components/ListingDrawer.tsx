@@ -6,7 +6,9 @@ import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import type { WorkspaceItem } from "@/lib/geometry";
 import ObjectThumb from "@/components/ObjectThumb";
+import AgentTab from "@/components/AgentTab";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const CONDITIONS: { value: Doc<"listings">["condition"]; label: string }[] = [
   { value: "new", label: "New" },
@@ -46,6 +48,7 @@ export default function ListingDrawer({
   const [price, setPrice] = useState(String(listing.price));
   const [condition, setCondition] = useState(listing.condition);
   const [researchOpen, setResearchOpen] = useState(false);
+  const [tab, setTab] = useState<"details" | "agent">("details");
 
   // A different listing (nav, or a fresh generation) replaces the local draft.
   useEffect(() => {
@@ -54,6 +57,7 @@ export default function ListingDrawer({
     setPrice(String(listing.price));
     setCondition(listing.condition);
     setResearchOpen(false);
+    setTab("details");
   }, [listing._id, listing.title, listing.description, listing.price, listing.condition]);
 
   useEffect(() => {
@@ -118,6 +122,31 @@ export default function ListingDrawer({
           </button>
         </div>
 
+        <div className="mt-4 flex gap-1 rounded-full bg-canvas p-1">
+          <button
+            onClick={() => setTab("details")}
+            className={cn(
+              "flex-1 rounded-full py-1.5 text-sm font-medium transition-colors",
+              tab === "details" ? "bg-surface text-ink shadow-sm" : "text-muted",
+            )}
+          >
+            Details
+          </button>
+          <button
+            onClick={() => setTab("agent")}
+            className={cn(
+              "flex-1 rounded-full py-1.5 text-sm font-medium transition-colors",
+              tab === "agent" ? "bg-surface text-ink shadow-sm" : "text-muted",
+            )}
+          >
+            Agent
+          </button>
+        </div>
+
+        {tab === "agent" ? (
+          <AgentTab listing={listing} />
+        ) : (
+          <>
         <div className="mt-4 flex justify-center rounded-xl bg-canvas p-4">
           <ObjectThumb imageUrl={imageUrl} bbox={item.bbox} className="h-36" />
         </div>
@@ -257,6 +286,8 @@ export default function ListingDrawer({
               {listing.status === "publishing" ? "Publishing…" : "Approve listing"}
             </Button>
           </div>
+        )}
+          </>
         )}
       </motion.aside>
     </>
