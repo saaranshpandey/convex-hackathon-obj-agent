@@ -5,18 +5,22 @@ type Props = {
   total: number;
   selectedCount: number;
   drawing: boolean;
+  researching: boolean;
   onSelectAll: () => void;
   onClear: () => void;
   onToggleDrawing: () => void;
+  onContinue: () => void;
 };
 
 export default function CanvasToolbar({
   total,
   selectedCount,
   drawing,
+  researching,
   onSelectAll,
   onClear,
   onToggleDrawing,
+  onContinue,
 }: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
@@ -54,8 +58,13 @@ export default function CanvasToolbar({
         >
           Clear
         </Button>
-        <Button variant="accent" className="ml-1.5" disabled={selectedCount === 0}>
-          Continue with {selectedCount}
+        <Button
+          variant="accent"
+          className="ml-1.5"
+          disabled={selectedCount === 0 || researching}
+          onClick={onContinue}
+        >
+          {researching ? "Researching…" : `Continue with ${selectedCount}`}
           <ArrowRight className="size-4" strokeWidth={2.25} />
         </Button>
       </div>

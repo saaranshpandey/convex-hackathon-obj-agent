@@ -26,6 +26,7 @@ export default function App() {
   const renameItem = useMutation(api.items.rename);
   const addManualItem = useMutation(api.items.addManual);
   const removeItem = useMutation(api.items.remove);
+  const startResearch = useMutation(api.research.startResearch);
   const resetDemoData = useMutation(api.dev.resetDemoData);
 
   const [busy, setBusy] = useState(false);
@@ -223,6 +224,9 @@ export default function App() {
                   setDrawing(false);
                   setComposingNew(true);
                 }}
+                onContinue={() =>
+                  void startResearch({ cleanoutId: workspace.cleanout._id })
+                }
               />
             </motion.div>
           )}

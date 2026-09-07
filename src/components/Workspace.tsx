@@ -5,6 +5,7 @@ import PhotoCanvas from "@/components/PhotoCanvas";
 import CanvasToolbar from "@/components/CanvasToolbar";
 import ObjectChips from "@/components/ObjectChips";
 import DetailPanel from "@/components/DetailPanel";
+import ResearchStatusBar from "@/components/ResearchStatusBar";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -25,6 +26,7 @@ type Props = {
   onAddItem: (name: string, box: Rect) => void;
   onRetry: () => void;
   onNewPhoto: () => void;
+  onContinue: () => void;
 };
 
 export default function Workspace({
@@ -45,6 +47,7 @@ export default function Workspace({
   onAddItem,
   onRetry,
   onNewPhoto,
+  onContinue,
 }: Props) {
   if (cleanout.status === "uploading") {
     return (
@@ -98,9 +101,18 @@ export default function Workspace({
   const ready = cleanout.status === "ready";
   const foundNothing = ready && items.length === 0;
   const selectedCount = items.filter((item) => item.selected).length;
+  const researching = items.some(
+    (item) =>
+      item.selected &&
+      (item.researchStatus === "queued" ||
+        item.researchStatus === "identifying" ||
+        item.researchStatus === "researching"),
+  );
 
   return (
-    <div className="grid gap-7 pt-3 lg:grid-cols-[minmax(0,2.05fr)_minmax(0,1fr)] lg:gap-8">
+    <div className="space-y-5 pt-3">
+      <ResearchStatusBar items={items} />
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,2.05fr)_minmax(0,1fr)] lg:gap-8">
       <div className="min-w-0 space-y-5">
         <PhotoCanvas
           imageUrl={imageUrl}
@@ -149,9 +161,11 @@ export default function Workspace({
               total={items.length}
               selectedCount={selectedCount}
               drawing={drawing}
+              researching={researching}
               onSelectAll={onSelectAll}
               onClear={onClear}
               onToggleDrawing={onToggleDrawing}
+              onContinue={onContinue}
             />
             <ObjectChips
               items={items}
@@ -178,6 +192,7 @@ export default function Workspace({
           onRemove={onRemove}
         />
       )}
+      </div>
     </div>
   );
 }
