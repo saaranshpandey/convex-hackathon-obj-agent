@@ -3,6 +3,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/Toaster";
 
 /**
  * The offer state of a live listing. Deliberately no views or watchers — those
@@ -14,6 +15,7 @@ export default function OfferCard({ listing }: { listing: Doc<"listings"> }) {
   const decide = useAction(api.offers.decide);
   const simulateBuyerAccepts = useMutation(api.offers.simulateBuyerAcceptsCounter);
 
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +37,19 @@ export default function OfferCard({ listing }: { listing: Doc<"listings"> }) {
     setError(null);
     try {
       const result = await decide({ offerId: offer._id, action, amount });
-      if (!result.ok) setError(result.reason ?? "That didn't go through.");
+      if (result.ok) {
+        toast.success(
+          action === "accept"
+            ? "Offer accepted."
+            : action === "decline"
+              ? "Offer declined."
+              : `Counter sent at $${amount}.`,
+        );
+      } else {
+        const reason = result.reason ?? "That didn't go through.";
+        setError(reason);
+        toast.error(reason);
+      }
     } finally {
       setBusy(false);
     }

@@ -27,6 +27,7 @@ export default function App() {
   const addManualItem = useMutation(api.items.addManual);
   const removeItem = useMutation(api.items.remove);
   const startResearch = useMutation(api.research.startResearch);
+  const seedDemoRoom = useMutation(api.demo.seedRoom);
   const resetDemoData = useMutation(api.dev.resetDemoData);
 
   const [busy, setBusy] = useState(false);
@@ -107,18 +108,42 @@ export default function App() {
     ],
   );
 
+  /**
+   * The demo room is seeded rather than detected: the whole flow runs off
+   * fixture data, so a judge sees the product even if OpenAI, fal, Firecrawl or
+   * AgentMail are unavailable. Only the image upload touches the network.
+   */
   const startDemo = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
       const response = await fetch(demoRoom);
-      const blob = await response.blob();
-      await startCleanout(blob, "Demo room");
+      const prepared = await prepareUpload(await response.blob());
+
+      const uploadUrl = await generateUploadUrl();
+      const result = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": prepared.blob.type },
+        body: prepared.blob,
+      });
+      if (!result.ok) throw new Error(`Upload failed with status ${result.status}`);
+      const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
+
+      await seedDemoRoom({
+        sessionId,
+        storageId,
+        imageWidth: prepared.width || undefined,
+        imageHeight: prepared.height || undefined,
+      });
+
+      setActiveId(null);
+      setComposingNew(false);
     } catch {
-      setError("Could not load the demo room image.");
+      setError("Could not start the demo room.");
+    } finally {
       setBusy(false);
     }
-  }, [startCleanout]);
+  }, [generateUploadUrl, seedDemoRoom, sessionId]);
 
   const handleReset = useCallback(async () => {
     setBusy(true);
@@ -157,6 +182,7 @@ export default function App() {
         }}
         onReset={import.meta.env.DEV ? handleReset : undefined}
         sessionId={sessionId}
+        isDemo={workspace?.cleanout.isDemo === true}
       />
 
       <main className="mx-auto w-full max-w-[1600px] px-6 pb-16 sm:px-8">

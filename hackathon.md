@@ -12,7 +12,7 @@
 - **Auth:** none
 - **AI models:** gpt-5.6-luna, fal-ai/sam2/image
 - **Started:** 2026-09-07T05:06:14Z
-- **Last updated:** 2026-09-07T23:56:34Z
+- **Last updated:** 2026-09-08T00:26:33Z
 
 ## Log
 
@@ -123,3 +123,22 @@ in the client. Convex features: schema, indexes, queries, mutations, actions,
 internal functions, scheduled functions (`convex/marketplace/`,
 `convex/offers.ts`, `convex/agentMail.ts`, `tests/marketplace/ebayXml.test.ts`,
 `src/components/OfferCard.tsx`).
+
+### 2026-09-08 - working tree
+Final pass: demo mode, so the product can be walked end to end even when every
+external provider is unavailable. "Try demo room" now seeds a room — PS5,
+guitar, monitor, chair — and simulates each stage through scheduled Convex
+mutations rather than a client timer, so the progression arrives over the same
+reactive subscriptions the live pipeline uses; only the image upload touches the
+network. The seeded objects reuse the hand-traced outlines already used by the
+mock segmentation provider, and the canvas fallback now traces an item's polygon
+instead of its bounding box, so they draw as real silhouettes (identical output
+for a live box detection, whose polygon is that same rectangle). A demo room is
+an ordinary room carrying `isDemo`, shown only as a discreet "Demo" chip, and it
+is also what authorises the simulated buyer events — real listings refuse them
+without a deployment-wide flag. Added a small toast system with an aria-live
+region, currently wired to offer decisions. Verified the whole loop against the
+seeded room with no AI calls: scan 1.9s, research to drafts 3.9s, mock publish
+0.7s, offer to owner notification 0.1s, counter and buyer acceptance settling
+the listing as sold (`convex/demo.ts`, `convex/demoData.ts`, `convex/offers.ts`,
+`src/components/Toaster.tsx`, `src/components/ObjectCanvas.tsx`).

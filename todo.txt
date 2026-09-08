@@ -3,3 +3,7 @@ take buffer boundary pixels for product photos
 
 
 cache researched data
+
+remove noise from response in the email chat
+
+fix the UI transition from continue -> review -> approve listing -> monitor listing

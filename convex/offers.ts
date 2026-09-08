@@ -22,11 +22,15 @@ import { isValidAmount } from "./money";
 import { getActivityMode, getMarketplaceProvider } from "./marketplace/provider";
 import { env } from "./_generated/server";
 
-/** Simulated marketplace events may only be fabricated on a demo deployment. */
-function requireDemoMode(): void {
-  if (env.DEMO_MODE?.trim() !== "true") {
-    throw new Error("Simulated marketplace events are disabled on this deployment.");
-  }
+/**
+ * Simulated marketplace events are allowed on a seeded demo room (so a judge
+ * can walk the whole loop) or on a deployment explicitly marked as a demo.
+ * Never on a real listing by default — these mutations are public.
+ */
+function assertSimulationAllowed(isDemoRoom: boolean): void {
+  if (isDemoRoom) return;
+  if (env.DEMO_MODE?.trim() === "true") return;
+  throw new Error("Simulated marketplace events are disabled for this listing.");
 }
 
 export const listForListing = query({
@@ -132,9 +136,10 @@ export const ingest = internalMutation({
 export const simulateBuyerOffer = mutation({
   args: { listingId: v.id("listings"), amount: v.number() },
   handler: async (ctx, args) => {
-    requireDemoMode();
     const listing = await ctx.db.get("listings", args.listingId);
     if (listing === null) throw new Error("Listing not found");
+    const cleanout = await ctx.db.get("cleanouts", listing.cleanoutId);
+    assertSimulationAllowed(cleanout?.isDemo === true);
     if (listing.status !== "live") {
       throw new Error("Only a live listing can receive an offer");
     }
@@ -159,9 +164,12 @@ export const simulateBuyerOffer = mutation({
 export const simulateBuyerAcceptsCounter = mutation({
   args: { offerId: v.id("offers") },
   handler: async (ctx, args) => {
-    requireDemoMode();
     const offer = await ctx.db.get("offers", args.offerId);
     if (offer === null) throw new Error("Offer not found");
+    const parentListing = await ctx.db.get("listings", offer.listingId);
+    const parentCleanout =
+      parentListing === null ? null : await ctx.db.get("cleanouts", parentListing.cleanoutId);
+    assertSimulationAllowed(parentCleanout?.isDemo === true);
     if (offer.status !== "countered") {
       throw new Error("Only a countered offer can be accepted by the buyer");
     }

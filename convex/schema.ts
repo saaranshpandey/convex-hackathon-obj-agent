@@ -155,6 +155,12 @@ export default defineSchema({
     imageHeight: v.optional(v.number()),
     /** Which segmentation provider produced this cleanout's items. */
     provider: v.optional(v.string()),
+    /**
+     * A seeded demo room. Renders identically to a real one apart from a
+     * discreet indicator, and is the only place simulated marketplace events
+     * may be fabricated when DEMO_MODE is off.
+     */
+    isDemo: v.optional(v.boolean()),
     /** Benchmark instrumentation. */
     detectionLatencyMs: v.optional(v.number()),
     detectionPromptTokens: v.optional(v.number()),

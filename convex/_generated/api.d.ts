@@ -14,6 +14,8 @@ import type * as agentMail_client from "../agentMail/client.js";
 import type * as agentMail_parseReply from "../agentMail/parseReply.js";
 import type * as agentMail_verify from "../agentMail/verify.js";
 import type * as cleanouts from "../cleanouts.js";
+import type * as demo from "../demo.js";
+import type * as demoData from "../demoData.js";
 import type * as detection from "../detection.js";
 import type * as dev from "../dev.js";
 import type * as ebay_index from "../ebay/index.js";
@@ -58,6 +60,8 @@ declare const fullApi: ApiFromModules<{
   "agentMail/parseReply": typeof agentMail_parseReply;
   "agentMail/verify": typeof agentMail_verify;
   cleanouts: typeof cleanouts;
+  demo: typeof demo;
+  demoData: typeof demoData;
   detection: typeof detection;
   dev: typeof dev;
   "ebay/index": typeof ebay_index;

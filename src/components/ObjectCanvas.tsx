@@ -156,13 +156,6 @@ export default function ObjectCanvas({
         const entry = masks.get(item._id);
         const ready = item.maskStatus === "ready" && entry !== undefined;
 
-        const box = {
-          x: item.bbox.x * width,
-          y: item.bbox.y * height,
-          w: item.bbox.width * width,
-          h: item.bbox.height * height,
-        };
-
         if (ready) {
           const target = 1;
           const current = fadeRef.current.get(item._id) ?? 0;
@@ -194,17 +187,35 @@ export default function ObjectCanvas({
           const selected = item.selected;
           ctx.globalAlpha = 1;
           ctx.fillStyle = LIME;
+          // Trace the item's own polygon. For a box-only detection that
+          // polygon IS the rectangle, so this is identical there — but a
+          // pre-traced outline (demo room, mock provider) draws as a real
+          // silhouette instead of being flattened to a box.
+          const trace = (target: CanvasRenderingContext2D) => {
+            target.beginPath();
+            item.polygon.forEach((point, index) => {
+              const px = point.x * width;
+              const py = point.y * height;
+              if (index === 0) target.moveTo(px, py);
+              else target.lineTo(px, py);
+            });
+            target.closePath();
+          };
+
           ctx.globalAlpha = selected ? (hovered ? 0.1 : 0.07) : hovered ? 0.05 : 0.02;
-          ctx.fillRect(box.x, box.y, box.w, box.h);
+          trace(ctx);
+          ctx.fill();
 
           ctx.globalAlpha = selected ? 0.9 : hovered ? 0.6 : 0.35;
           ctx.strokeStyle = LIME;
           ctx.lineWidth = 1;
-          ctx.strokeRect(box.x + 0.5, box.y + 0.5, box.w - 1, box.h - 1);
+          trace(ctx);
+          ctx.stroke();
           ctx.globalAlpha = 1;
 
           pctx.fillStyle = pickColor;
-          pctx.fillRect(box.x, box.y, box.w, box.h);
+          trace(pctx);
+          pctx.fill();
         }
       });
 

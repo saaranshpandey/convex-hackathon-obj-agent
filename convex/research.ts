@@ -81,6 +81,17 @@ export const startResearch = mutation({
       message: `Researching resale value for ${selected.length} ${selected.length === 1 ? "item" : "items"}…`,
     });
 
+    // A demo room runs the same stages against seeded data, so a judge sees the
+    // whole flow even when the AI providers are down or out of credit.
+    const cleanout = await ctx.db.get("cleanouts", args.cleanoutId);
+    if (cleanout?.isDemo === true) {
+      await ctx.scheduler.runAfter(0, internal.demo.simulateResearch, {
+        cleanoutId: args.cleanoutId,
+        itemIds: selected.map((item) => item._id),
+      });
+      return null;
+    }
+
     await ctx.scheduler.runAfter(0, internal.research.researchCleanout, {
       cleanoutId: args.cleanoutId,
       itemIds: selected.map((item) => item._id),

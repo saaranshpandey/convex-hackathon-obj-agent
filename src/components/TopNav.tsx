@@ -3,12 +3,16 @@ import EbayConnectButton from "@/components/EbayConnectButton";
 
 type Props = {
   onHome: () => void;
+  /** Discreet marker that this room's activity is seeded, not real. */
+  isDemo?: boolean;
   /** Provided only in development — wipes this session's Convex data. */
   onReset?: () => void;
   sessionId: string;
 };
 
-export default function TopNav({ onHome, onReset, sessionId }: Props) {
+export default function TopNav({
+  onHome,
+  isDemo = false, onReset, sessionId }: Props) {
   return (
     <header className="sticky top-0 z-30 bg-canvas/85 backdrop-blur-sm">
       <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between px-6 sm:px-8">
@@ -26,6 +30,14 @@ export default function TopNav({ onHome, onReset, sessionId }: Props) {
         </button>
 
         <nav className="flex items-center gap-1">
+          {isDemo && (
+            <span
+              title="This room's data is seeded so the full flow works offline"
+              className="mr-1 rounded-full bg-line px-2.5 py-1 text-[11px] font-medium tracking-wide text-muted uppercase"
+            >
+              Demo
+            </span>
+          )}
           {onReset && (
             <button
               onClick={onReset}
