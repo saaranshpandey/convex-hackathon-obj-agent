@@ -8,7 +8,7 @@ import {
 import { internal } from "./_generated/api";
 import { env } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
-import { EbayError, getEbayPublisher } from "./ebay";
+import { EbayError, getEbayMode, getEbayPublisher } from "./ebay";
 import { refreshAccessToken } from "./ebay/oauth";
 
 /**
@@ -84,6 +84,7 @@ export const contextForPublish = internalQuery({
       imageUrl,
       brand: item.identification?.brand ?? null,
       itemType: item.identification?.category ?? null,
+      detectionBox: item.detectionBox,
     };
   },
 });
@@ -185,6 +186,15 @@ export const publishOne = internalAction({
       const auth = await getValidAccessToken(ctx, args.sessionId);
       if (auth === null) throw new Error("Connect your eBay account before publishing.");
 
+      // Mock mode never looks at the image — skip the crop so it stays free.
+      const productImageUrl: string =
+        getEbayMode() === "mock"
+          ? context.imageUrl
+          : await ctx.runAction(internal.imageCrop.cropToBox, {
+              imageUrl: context.imageUrl,
+              box: context.detectionBox,
+            });
+
       const publisher = getEbayPublisher();
       const result = await publisher.publish({
         accessToken: auth.accessToken,
@@ -200,7 +210,7 @@ export const publishOne = internalAction({
           description: context.listing.description,
           price: context.listing.price,
           condition: context.listing.condition,
-          imageUrl: context.imageUrl,
+          imageUrl: productImageUrl,
           brand: context.brand,
           itemType: context.itemType,
         },

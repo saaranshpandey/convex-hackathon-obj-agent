@@ -28,6 +28,7 @@ import type * as ebaySetup from "../ebaySetup.js";
 import type * as generateListing from "../generateListing.js";
 import type * as http from "../http.js";
 import type * as identify from "../identify.js";
+import type * as imageCrop from "../imageCrop.js";
 import type * as items from "../items.js";
 import type * as listingPublish from "../listingPublish.js";
 import type * as listings from "../listings.js";
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   generateListing: typeof generateListing;
   http: typeof http;
   identify: typeof identify;
+  imageCrop: typeof imageCrop;
   items: typeof items;
   listingPublish: typeof listingPublish;
   listings: typeof listings;
