@@ -70,12 +70,18 @@ export function createSandboxPublisher(env: EbayEnv): EbayPublisher {
 
       const sku = input.listing.sku;
 
+      // Many categories reject a publish without a Brand item aspect. "Type"
+      // and other category-specific aspects vary too widely to fill in
+      // generically here — a missing one still surfaces as a clear error.
+      const brand = input.listing.brand ?? "Unbranded";
+
       await ebayRequest(env, input.accessToken, "PUT", `/sell/inventory/v1/inventory_item/${sku}`, {
         condition: CONDITION_MAP[input.listing.condition],
         product: {
           title: input.listing.title,
           description: input.listing.description,
           imageUrls: [input.listing.imageUrl],
+          aspects: { Brand: [brand] },
         },
         // No real package dimensions are known at this stage — a generic
         // small-parcel default so publish doesn't fail on a missing field.

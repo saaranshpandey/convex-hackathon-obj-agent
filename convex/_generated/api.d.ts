@@ -24,6 +24,7 @@ import type * as ebay_oauth from "../ebay/oauth.js";
 import type * as ebay_sandbox from "../ebay/sandbox.js";
 import type * as ebay_types from "../ebay/types.js";
 import type * as ebayAuth from "../ebayAuth.js";
+import type * as ebaySetup from "../ebaySetup.js";
 import type * as generateListing from "../generateListing.js";
 import type * as http from "../http.js";
 import type * as identify from "../identify.js";
@@ -70,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   "ebay/sandbox": typeof ebay_sandbox;
   "ebay/types": typeof ebay_types;
   ebayAuth: typeof ebayAuth;
+  ebaySetup: typeof ebaySetup;
   generateListing: typeof generateListing;
   http: typeof http;
   identify: typeof identify;

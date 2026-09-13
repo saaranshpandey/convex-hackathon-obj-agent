@@ -38,6 +38,9 @@ export type PublishInput = {
     price: number;
     condition: "new" | "like_new" | "good" | "fair" | "poor";
     imageUrl: string;
+    /** From Phase 4 identification, when known — many categories require a
+     * Brand item aspect before they'll let an offer publish. */
+    brand?: string | null;
   };
 };
 

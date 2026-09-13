@@ -6,7 +6,12 @@
 
 import { EbayError, type EbayEnv, type EbayAccessToken, type EbayTokens } from "./types";
 
-const SCOPES = "https://api.ebay.com/oauth/api_scope/sell.inventory";
+// sell.account is needed to provision the merchant location and the
+// fulfillment/payment/return business policies that publishing requires.
+const SCOPES = [
+  "https://api.ebay.com/oauth/api_scope/sell.inventory",
+  "https://api.ebay.com/oauth/api_scope/sell.account",
+].join(" ");
 
 function authBase(env: EbayEnv): string {
   return env === "production" ? "https://auth.ebay.com" : "https://auth.sandbox.ebay.com";
