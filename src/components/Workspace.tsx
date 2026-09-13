@@ -1,13 +1,12 @@
+import { useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { AlertCircle, Check, Loader2, Plus, SearchX } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, Loader2, Plus } from "lucide-react";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import type { Rect, WorkspaceItem } from "@/lib/geometry";
+import { saleFlow } from "@/lib/saleFlow";
 import PhotoCanvas from "@/components/PhotoCanvas";
-import CanvasToolbar from "@/components/CanvasToolbar";
-import ObjectChips from "@/components/ObjectChips";
-import DetailPanel from "@/components/DetailPanel";
-import ResearchStatusBar from "@/components/ResearchStatusBar";
-import ListingsBar from "@/components/ListingsBar";
+import ObjectThumb from "@/components/ObjectThumb";
+import SaleReview from "@/components/SaleReview";
 import ListingDrawer from "@/components/ListingDrawer";
 import { Button } from "@/components/ui/button";
 
@@ -23,7 +22,6 @@ type Props = {
   reviewingListingId: Id<"listings"> | null;
   onToggle: (id: Id<"items">) => void;
   onHover: (id: Id<"items"> | null) => void;
-  onActivate: (id: Id<"items"> | null) => void;
   onRename: (id: Id<"items">, name: string) => void;
   onRemove: (id: Id<"items">) => void;
   onSelectAll: () => void;
@@ -32,229 +30,143 @@ type Props = {
   onAddItem: (name: string, box: Rect) => void;
   onRetry: () => void;
   onNewPhoto: () => void;
-  onContinue: () => void;
+  onContinue: () => Promise<unknown>;
   onReviewListing: (listingId: Id<"listings">) => void;
   onCloseDrawer: () => void;
-  onNavigateListing: (direction: "prev" | "next") => void;
 };
 
 export default function Workspace({
-  cleanout,
-  imageUrl,
-  items,
-  listings,
-  activeId,
-  hoveredId,
-  drawing,
-  sessionId,
-  reviewingListingId,
-  onToggle,
-  onHover,
-  onActivate,
-  onRename,
-  onRemove,
-  onSelectAll,
-  onClear,
-  onToggleDrawing,
-  onAddItem,
-  onRetry,
-  onNewPhoto,
-  onContinue,
-  onReviewListing,
-  onCloseDrawer,
-  onNavigateListing,
+  cleanout, imageUrl, items, listings, activeId, hoveredId, drawing, sessionId,
+  reviewingListingId, onToggle, onHover, onRename, onRemove, onSelectAll,
+  onClear, onToggleDrawing, onAddItem, onRetry, onNewPhoto, onContinue,
+  onReviewListing, onCloseDrawer,
 }: Props) {
-  if (cleanout.status === "uploading") {
-    return (
-      <Card>
-        <Loader2 className="size-5 animate-spin text-muted" strokeWidth={1.75} />
-        <p className="mt-4 text-sm text-ink-soft">Uploading your photo…</p>
-      </Card>
-    );
-  }
-
-  if (cleanout.status === "failed") {
-    return (
-      <Card>
-        <AlertCircle className="size-5 text-muted" strokeWidth={1.75} />
-        <h2 className="mt-4 text-[15px] font-semibold text-ink">
-          That scan didn't work
-        </h2>
-        <p className="mt-2 text-sm text-pretty text-ink-soft">
-          {cleanout.error ?? "Detection failed for this photo."}
-        </p>
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          {cleanout.imageStorageId && (
-            <Button size="sm" onClick={onRetry}>
-              Try again
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={onNewPhoto}>
-            Use a different photo
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  if (imageUrl === null) {
-    return (
-      <Card>
-        <AlertCircle className="size-5 text-muted" strokeWidth={1.75} />
-        <p className="mt-4 text-sm text-ink-soft">
-          That room photo is no longer available in storage.
-        </p>
-        <Button size="sm" variant="outline" className="mt-6" onClick={onNewPhoto}>
-          Upload another
-        </Button>
-      </Card>
-    );
-  }
-
+  const [choosing, setChoosing] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false);
+  const flow = saleFlow(items, listings);
+  const preparing = starting || flow.working;
+  const reviewing = !choosing && flow.started && !preparing;
   const scanning = cleanout.status === "analyzing";
-  const revealing = cleanout.status === "objects_found";
-  const ready = cleanout.status === "ready";
-  const foundNothing = ready && items.length === 0;
-  const selectedCount = items.filter((item) => item.selected).length;
-  const researching = items.some(
-    (item) =>
-      item.selected &&
-      (item.researchStatus === "queued" ||
-        item.researchStatus === "identifying" ||
-        item.researchStatus === "researching"),
-  );
-  const activeListing =
-    listings.find((listing) => listing._id === reviewingListingId) ?? null;
-  const activeListingItem = activeListing
-    ? (items.find((item) => item._id === activeListing.itemId) ?? null)
-    : null;
-  const activeListingIndex = activeListing
-    ? listings.findIndex((listing) => listing._id === activeListing._id)
-    : -1;
+  const activeListing = flow.included.find((listing) => listing._id === reviewingListingId);
+  const activeItem = items.find((item) => item._id === activeListing?.itemId);
+
+  const prepare = async () => {
+    if (submitting.current || flow.selected.length === 0) return;
+    setError(null);
+    // Reuse existing drafts, including edits, when only removing items.
+    if (flow.included.length === flow.selected.length) {
+      setChoosing(false);
+      return;
+    }
+    submitting.current = true;
+    setStarting(true);
+    try {
+      await onContinue();
+      setChoosing(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Couldn't prepare your listings. Try again.");
+    } finally {
+      submitting.current = false;
+      setStarting(false);
+    }
+  };
+
+  if (cleanout.status === "uploading") {
+    return <Card><Loader2 className="size-6 animate-spin text-muted" /><h1 className="mt-4 font-medium">Adding your photo…</h1></Card>;
+  }
+  if (cleanout.status === "failed" || imageUrl === null) {
+    return <Card>
+      <AlertCircle className="size-6 text-muted" />
+      <h1 className="mt-4 font-medium">We couldn't read that photo</h1>
+      <p className="mt-2 text-sm text-muted">{cleanout.error ?? "Try another room photo."}</p>
+      <div className="mt-5 flex gap-2">
+        {cleanout.imageStorageId && <Button onClick={onRetry}>Try again</Button>}
+        <Button variant="ghost" onClick={onNewPhoto}>Change photo</Button>
+      </div>
+    </Card>;
+  }
 
   return (
-    <div className="space-y-6 pt-8 sm:pt-10">
-      <div className="flex flex-wrap items-center justify-between gap-5">
-        <div>
-          <p className="text-xs font-medium tracking-[0.12em] text-muted uppercase">Your selling workspace</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">A little space. A fresh start.</h1>
-          <p className="mt-2 text-sm text-muted">{scanning ? "Finding the possibilities in your photo." : `${items.length} items found. Choose what you're ready to let go.`}</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={onNewPhoto}><Plus />New photo</Button>
-      </div>
-      <ol aria-label="Sale progress" className="flex flex-wrap items-center gap-x-6 gap-y-3 border-y border-line py-4 sm:gap-10">
-        {["Select items", "Research prices", "Review listings"].map((label, index) => {
-          const currentStep = listings.length > 0 ? 2 : researching || items.some((item) => item.researchStatus) ? 1 : 0;
-          return <li key={label} aria-current={index === currentStep ? "step" : undefined} className={`flex items-center gap-2 text-xs ${index === currentStep ? "font-medium text-ink" : "text-muted"}`}><span className={`flex size-6 items-center justify-center rounded-full text-[10px] ${index === currentStep ? "bg-ink text-white" : index < currentStep ? "bg-accent text-accent-ink" : "bg-line text-muted"}`}>{index < currentStep ? <Check className="size-3" /> : `0${index + 1}`}</span>{label}</li>;
+    <div className="mx-auto max-w-5xl pb-8 pt-8 sm:pt-12">
+      <ol aria-label="Sale progress" className="mb-8 flex justify-center gap-5 sm:gap-10">
+        {["Choose items", "Review", "Published"].map((label, index) => {
+          const step = flow.complete && !choosing ? 2 : reviewing || preparing ? 1 : 0;
+          return <li key={label} aria-current={step === index ? "step" : undefined} className={`flex items-center gap-2 text-xs ${step === index ? "font-medium text-ink" : "text-muted"}`}>
+            <span className={`flex size-6 items-center justify-center rounded-full text-[11px] ${step === index ? "bg-ink text-white" : "bg-line text-muted"}`}>{step > index ? <Check className="size-3" /> : index + 1}</span>{label}
+          </li>;
         })}
       </ol>
-      <ResearchStatusBar items={items} />
-      <div className="grid gap-7 lg:grid-cols-[minmax(0,2.05fr)_minmax(0,1fr)] lg:gap-8">
-      <div className="min-w-0 space-y-5">
-        <PhotoCanvas
-          imageUrl={imageUrl}
-          items={items}
-          scanning={scanning}
-          scanLabel="Scanning room…"
-          drawing={drawing}
-          hoveredId={hoveredId}
-          activeId={activeId}
-          onToggle={onToggle}
-          onHover={onHover}
-          onAddItem={onAddItem}
-          onCancelDrawing={onToggleDrawing}
-        />
+      <div className="mb-7 text-center">
+        <h1 className="text-3xl font-semibold tracking-[-0.035em]">
+          {preparing ? "Preparing your listings" : reviewing ? flow.complete ? "You're all set" : "Review before publishing" : scanning ? "Finding your items" : "What would you like to sell?"}
+        </h1>
+        <p className="mt-2 text-sm text-muted">
+          {preparing ? "Finding prices and writing the details. Nothing is published yet." : reviewing ? flow.complete ? "Manage your listings below." : "Check the prices. Edit anything you want." : scanning ? "This will only take a moment." : "Tap an item in the photo or choose it from the list."}
+        </p>
+      </div>
 
-        {foundNothing && (
-          <div className="surface flex flex-col items-center px-8 py-8 text-center">
-            <SearchX className="size-5 text-muted" strokeWidth={1.75} />
-            <h2 className="mt-4 text-[15px] font-semibold text-ink">
-              Nothing sellable in this one
-            </h2>
-            <p className="mt-2 max-w-sm text-sm text-pretty text-ink-soft">
-              The scan finished but didn't find any discrete objects worth
-              listing. You can scan again, add something by hand, or try a
-              different photo.
-            </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              <Button size="sm" onClick={onRetry}>
-                Scan again
-              </Button>
-              <Button size="sm" variant="outline" onClick={onToggleDrawing}>
-                Add one by hand
-              </Button>
-              <Button size="sm" variant="ghost" onClick={onNewPhoto}>
-                Different photo
+      {preparing ? (
+        <div className="mx-auto max-w-lg rounded-2xl border border-line bg-surface p-6" role="status" aria-live="polite">
+          <div className="mb-5 flex items-center gap-3"><Loader2 className="size-5 animate-spin text-accent-deep" /><span className="text-sm">Preparing {flow.selected.length} {flow.selected.length === 1 ? "item" : "items"}</span></div>
+          <ul className="space-y-4">{flow.selected.map((item) => <li key={item._id} className="flex items-center justify-between gap-4 text-sm"><span>{item.name}</span><span className="text-xs text-muted">{item.researchStatus === "failed" ? "Couldn't prepare" : flow.included.some((listing) => listing.itemId === item._id) ? "Ready" : item.researchStatus === "ready_for_review" ? "Writing listing…" : "Finding price…"}</span></li>)}</ul>
+        </div>
+      ) : reviewing ? (
+        <SaleReview imageUrl={imageUrl} items={items} listings={listings} sessionId={sessionId}
+          onEdit={onReviewListing} onBack={() => { setChoosing(true); onCloseDrawer(); }}
+          onSkip={onToggle} onNewPhoto={onNewPhoto} />
+      ) : (
+        <>
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+            <div className="min-w-0">
+              <PhotoCanvas imageUrl={imageUrl} items={items} scanning={scanning} scanLabel="Finding items…"
+                drawing={drawing} hoveredId={hoveredId} activeId={activeId}
+                onToggle={onToggle} onHover={onHover} onAddItem={onAddItem} onCancelDrawing={onToggleDrawing} />
+              {!scanning && <div className="mt-3 flex items-center justify-between">
+                <Button variant="ghost" size="sm" onClick={onToggleDrawing}><Plus />{drawing ? "Cancel selection" : "Add missing item"}</Button>
+                <Button variant="ghost" size="sm" onClick={onNewPhoto}>Change photo</Button>
+              </div>}
+            </div>
+            {!scanning && <div className="rounded-2xl border border-line bg-surface p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-medium">{items.length} items found</h2>
+                <Button variant="ghost" size="sm" disabled={items.length === 0} onClick={flow.selected.length === items.length ? onClear : onSelectAll}>{flow.selected.length === items.length && items.length > 0 ? "Clear" : "Select all"}</Button>
+              </div>
+              {items.length === 0 && <p className="py-6 text-sm text-muted">No items found. Use “Add missing item” to select one in the photo.</p>}
+              <ul className="space-y-1">{items.map((item) => (
+                <li key={item._id} onPointerEnter={() => onHover(item._id)} onPointerLeave={() => onHover(null)}>
+                  <label className="flex cursor-pointer items-center gap-3 rounded-xl p-2 hover:bg-canvas">
+                    <input type="checkbox" checked={item.selected} onChange={() => onToggle(item._id)} className="size-4 shrink-0 accent-accent-deep" />
+                    <ObjectThumb imageUrl={imageUrl} bbox={item.bbox} className="h-10 max-w-14" />
+                    <span className="min-w-0 flex-1 text-sm">{item.name}</span>
+                  </label>
+                  {item.source === "manual" && <details className="ml-9 text-xs text-muted">
+                    <summary className="cursor-pointer py-1">Edit item</summary>
+                    <input aria-label={`Rename ${item.name}`} defaultValue={item.name} key={item.name} onBlur={(event) => { if (event.target.value.trim()) onRename(item._id, event.target.value.trim()); }} className="my-2 w-full rounded border border-line px-2 py-1.5" />
+                    <button className="mb-2 text-red-700" onClick={() => onRemove(item._id)}>Remove item</button>
+                  </details>}
+                </li>
+              ))}</ul>
+            </div>}
+          </div>
+          {!scanning && <div className="sticky bottom-0 mt-6 border-t border-line bg-canvas/95 py-5 backdrop-blur-sm">
+            {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <p className="text-sm text-muted">{flow.selected.length} {flow.selected.length === 1 ? "item" : "items"} selected</p>
+              <Button disabled={flow.selected.length === 0 || drawing} onClick={() => void prepare()}>
+                {flow.selected.length > 0 && flow.included.length === flow.selected.length ? "Review listings" : "Prepare listings"}<ArrowRight />
               </Button>
             </div>
-          </div>
-        )}
-
-        {/* Interactive as soon as boxes exist — the reveal is only visual, and
-            mask refinement runs separately without blocking anything here. */}
-        {(ready || revealing) && !foundNothing && (
-          <>
-            <CanvasToolbar
-              total={items.length}
-              selectedCount={selectedCount}
-              drawing={drawing}
-              researching={researching}
-              onSelectAll={onSelectAll}
-              onClear={onClear}
-              onToggleDrawing={onToggleDrawing}
-              onContinue={onContinue}
-            />
-            <ObjectChips
-              items={items}
-              hoveredId={hoveredId}
-              onToggle={onToggle}
-              onHover={onHover}
-            />
-          </>
-        )}
-
-      </div>
-
-      {(ready || revealing) && (
-        <DetailPanel
-          cleanoutId={cleanout._id}
-          imageUrl={imageUrl}
-          items={items}
-          listings={listings}
-          activeId={activeId}
-          provider={cleanout.provider}
-          onToggle={onToggle}
-          onActivate={onActivate}
-          onHover={onHover}
-          onRename={onRename}
-          onRemove={onRemove}
-          onReviewListing={onReviewListing}
-        />
+            <p className="mt-3 text-right text-xs text-muted">{flow.included.length > 0 && flow.included.length < flow.selected.length ? "Preparing again replaces existing drafts with fresh prices and details." : "Next: review prices and listing details."}</p>
+          </div>}
+        </>
       )}
-      </div>
-
-      <ListingsBar
-        cleanoutId={cleanout._id}
-        sessionId={sessionId}
-        listings={listings}
-        onReviewAll={() => {
-          if (listings[0]) onReviewListing(listings[0]._id);
-        }}
-      />
 
       <AnimatePresence>
-        {activeListing && activeListingItem && (
-          <ListingDrawer
-            key={activeListing._id}
-            imageUrl={imageUrl}
-            listing={activeListing}
-            item={activeListingItem}
-            sessionId={sessionId}
-            hasPrev={activeListingIndex > 0}
-            hasNext={activeListingIndex < listings.length - 1}
-            onNavigate={onNavigateListing}
-            onClose={onCloseDrawer}
-          />
+        {reviewing && activeListing && activeItem && (
+          <ListingDrawer key={activeListing._id} imageUrl={imageUrl} listing={activeListing} item={activeItem}
+            onClose={onCloseDrawer} />
         )}
       </AnimatePresence>
     </div>
@@ -262,9 +174,5 @@ export default function Workspace({
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="surface mx-auto mt-16 flex max-w-md flex-col items-center px-8 py-12 text-center">
-      {children}
-    </div>
-  );
+  return <div className="mx-auto mt-16 flex max-w-md flex-col items-center rounded-2xl border border-line bg-surface px-8 py-12 text-center">{children}</div>;
 }

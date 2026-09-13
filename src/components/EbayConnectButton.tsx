@@ -26,7 +26,7 @@ export default function EbayConnectButton({ sessionId }: { sessionId: string }) 
 
   return (
     <div className="flex items-center gap-2">
-      {error && <span className="text-xs text-muted">{error}</span>}
+      {error && <span role="alert" className="text-xs text-red-700">{error}</span>}
       <button
         onClick={async () => {
           setConnecting(true);
@@ -43,7 +43,7 @@ export default function EbayConnectButton({ sessionId }: { sessionId: string }) 
           }
         }}
         disabled={connecting}
-        className="rounded-full px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-ink/5 hover:text-ink disabled:opacity-50"
+        className="h-10 rounded-full bg-accent-deep px-5 text-sm font-medium text-white transition-colors hover:bg-[#0077ed] disabled:opacity-50"
       >
         {connecting ? "Connecting…" : "Connect eBay"}
       </button>

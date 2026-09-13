@@ -1,5 +1,4 @@
 import { Plus, RotateCcw, Scan } from "lucide-react";
-import EbayConnectButton from "@/components/EbayConnectButton";
 
 type Props = {
   onHome: () => void;
@@ -7,12 +6,11 @@ type Props = {
   isDemo?: boolean;
   /** Provided only in development — wipes this session's Convex data. */
   onReset?: () => void;
-  sessionId: string;
 };
 
 export default function TopNav({
   onHome,
-  isDemo = false, onReset, sessionId }: Props) {
+  isDemo = false, onReset }: Props) {
   return (
     <header className="sticky top-0 z-30 border-b border-black/5 bg-canvas/80 backdrop-blur-xl">
       <div className="mx-auto flex h-[72px] w-full max-w-[1320px] items-center justify-between gap-3 px-4 sm:px-8">
@@ -38,7 +36,7 @@ export default function TopNav({
               Demo
             </span>
           )}
-          {onReset && (
+          {onReset && isDemo && (
             <button
               onClick={onReset}
               title="Reset demo data"
@@ -49,7 +47,6 @@ export default function TopNav({
               <span className="hidden lg:inline">Reset demo</span>
             </button>
           )}
-          <EbayConnectButton sessionId={sessionId} />
           <button onClick={onHome} aria-label="Start a new room" className="flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-medium text-ink shadow-sm ring-1 ring-black/5 transition-colors hover:bg-line sm:px-4">
             <Plus className="size-3.5" /><span className="hidden sm:inline">New room</span>
           </button>

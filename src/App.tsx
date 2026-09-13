@@ -181,7 +181,6 @@ export default function App() {
           setComposingNew(true);
         }}
         onReset={import.meta.env.DEV ? handleReset : undefined}
-        sessionId={sessionId}
         isDemo={workspace?.cleanout.isDemo === true}
       />
 
@@ -217,6 +216,7 @@ export default function App() {
               transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             >
               <Workspace
+                key={workspace.cleanout._id}
                 cleanout={workspace.cleanout}
                 imageUrl={workspace.imageUrl}
                 items={items}
@@ -231,7 +231,6 @@ export default function App() {
                   void toggleItem({ itemId });
                 }}
                 onHover={setHoveredId}
-                onActivate={setActiveId}
                 onRename={(itemId, name) => void renameItem({ itemId, name })}
                 onRemove={(itemId) => {
                   setActiveId(null);
@@ -259,21 +258,10 @@ export default function App() {
                   setComposingNew(true);
                 }}
                 onContinue={() =>
-                  void startResearch({ cleanoutId: workspace.cleanout._id })
+                  startResearch({ cleanoutId: workspace.cleanout._id })
                 }
                 onReviewListing={setReviewingListingId}
                 onCloseDrawer={() => setReviewingListingId(null)}
-                onNavigateListing={(direction) => {
-                  setReviewingListingId((current) => {
-                    if (current === null) return current;
-                    const index = listings.findIndex(
-                      (listing) => listing._id === current,
-                    );
-                    if (index === -1) return current;
-                    const nextIndex = direction === "next" ? index + 1 : index - 1;
-                    return listings[nextIndex]?._id ?? current;
-                  });
-                }}
               />
             </motion.div>
           )}

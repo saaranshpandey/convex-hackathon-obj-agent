@@ -1,295 +1,108 @@
-import { useEffect, useState } from "react";
-import { motion } from "motion/react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, X } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import type { WorkspaceItem } from "@/lib/geometry";
+import { canPublish } from "@/lib/saleFlow";
 import ObjectThumb from "@/components/ObjectThumb";
 import AgentTab from "@/components/AgentTab";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
-const CONDITIONS: { value: Doc<"listings">["condition"]; label: string }[] = [
-  { value: "new", label: "New" },
-  { value: "like_new", label: "Like new" },
-  { value: "good", label: "Good" },
-  { value: "fair", label: "Fair" },
-  { value: "poor", label: "Poor" },
-];
+const CONDITIONS: Doc<"listings">["condition"][] = ["new", "like_new", "good", "fair", "poor"];
 
 type Props = {
   imageUrl: string;
   listing: Doc<"listings">;
   item: WorkspaceItem;
-  sessionId: string;
-  hasPrev: boolean;
-  hasNext: boolean;
-  onNavigate: (direction: "prev" | "next") => void;
   onClose: () => void;
 };
 
-export default function ListingDrawer({
-  imageUrl,
-  listing,
-  item,
-  sessionId,
-  hasPrev,
-  hasNext,
-  onNavigate,
-  onClose,
-}: Props) {
+export default function ListingDrawer({ imageUrl, listing, item, onClose }: Props) {
   const updateListing = useMutation(api.listings.update);
-  const approveListing = useMutation(api.listings.approve);
-  const publishListing = useMutation(api.listingPublish.publish);
-
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const submitting = useRef(false);
   const [title, setTitle] = useState(listing.title);
   const [description, setDescription] = useState(listing.description);
   const [price, setPrice] = useState(String(listing.price));
   const [condition, setCondition] = useState(listing.condition);
-  const [researchOpen, setResearchOpen] = useState(false);
-  const [tab, setTab] = useState<"details" | "agent">("details");
-
-  // A different listing (nav, or a fresh generation) replaces the local draft.
-  useEffect(() => {
-    setTitle(listing.title);
-    setDescription(listing.description);
-    setPrice(String(listing.price));
-    setCondition(listing.condition);
-    setResearchOpen(false);
-    setTab("details");
-  }, [listing._id, listing.title, listing.description, listing.price, listing.condition]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const editable = canPublish(listing);
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      dialog?.close();
+      document.body.style.overflow = overflow;
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
-  const draft = () => ({
-    listingId: listing._id,
-    title,
-    description,
-    category: listing.category,
-    condition,
-    price: Number(price) || 0,
-  });
+  const save = async () => {
+    if (submitting.current || !editable) return;
+    if (!title.trim() || !Number.isFinite(Number(price)) || Number(price) <= 0) {
+      setError("Add a title and a price greater than $0.");
+      return;
+    }
+    submitting.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      await updateListing({ listingId: listing._id, title: title.trim(), description, category: listing.category, condition, price: Number(price) });
+      onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Couldn't save. Please try again.");
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  };
 
   return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        className="fixed inset-0 z-40 bg-ink/30"
-        onClick={onClose}
-      />
-      <motion.aside
-        initial={{ x: "100%" }}
-        animate={{ x: 0 }}
-        exit={{ x: "100%" }}
-        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="surface fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto p-6"
-      >
+    <dialog ref={dialogRef} aria-labelledby="listing-editor-title"
+      onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-0 text-ink shadow-xl backdrop:bg-ink/30">
+      <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="p-5 sm:p-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => onNavigate("prev")}
-              disabled={!hasPrev}
-              className="rounded-full p-1.5 text-muted transition-colors hover:bg-canvas hover:text-ink disabled:pointer-events-none disabled:opacity-30"
-              aria-label="Previous listing"
-            >
-              <ChevronLeft className="size-4" strokeWidth={2} />
-            </button>
-            <button
-              onClick={() => onNavigate("next")}
-              disabled={!hasNext}
-              className="rounded-full p-1.5 text-muted transition-colors hover:bg-canvas hover:text-ink disabled:pointer-events-none disabled:opacity-30"
-              aria-label="Next listing"
-            >
-              <ChevronRight className="size-4" strokeWidth={2} />
-            </button>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1.5 text-muted transition-colors hover:bg-canvas hover:text-ink"
-            aria-label="Close"
-          >
-            <X className="size-4" strokeWidth={2} />
-          </button>
+          <h2 id="listing-editor-title" className="text-lg font-semibold">{editable ? "Edit listing" : "Manage listing"}</h2>
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onClose} aria-label="Close listing"><X /></Button>
         </div>
-
-        <div className="mt-4 flex gap-1 rounded-full bg-canvas p-1">
-          <button
-            onClick={() => setTab("details")}
-            className={cn(
-              "flex-1 rounded-full py-1.5 text-sm font-medium transition-colors",
-              tab === "details" ? "bg-surface text-ink shadow-sm" : "text-muted",
-            )}
-          >
-            Details
-          </button>
-          <button
-            onClick={() => setTab("agent")}
-            className={cn(
-              "flex-1 rounded-full py-1.5 text-sm font-medium transition-colors",
-              tab === "agent" ? "bg-surface text-ink shadow-sm" : "text-muted",
-            )}
-          >
-            Agent
-          </button>
+        <div className="my-5 flex items-center gap-4 rounded-xl bg-canvas p-4">
+          <ObjectThumb imageUrl={imageUrl} bbox={item.bbox} className="h-20 max-w-28" />
+          <p className="text-sm font-medium">{item.name}</p>
         </div>
-
-        {tab === "agent" ? (
-          <AgentTab listing={listing} />
-        ) : (
-          <>
-        <div className="mt-4 flex justify-center rounded-xl bg-canvas p-4">
-          <ObjectThumb imageUrl={imageUrl} bbox={item.bbox} className="h-36" />
-        </div>
-
-        <label className="mt-5 block text-xs font-medium tracking-wide text-muted uppercase">
-          Title
-        </label>
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          className="mt-1.5 w-full rounded-lg bg-canvas px-3 py-2 text-sm text-ink outline-none"
-        />
-
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium tracking-wide text-muted uppercase">
-              Price
+        <fieldset disabled={busy || !editable} className="space-y-4 disabled:opacity-80">
+          <label className="block text-sm">Title
+            <input autoFocus required value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1.5 w-full rounded-lg border border-line px-3 py-2.5" />
+          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="block text-sm">Price ($)
+              <input required type="number" min="0.01" step="0.01" value={price} onChange={(event) => setPrice(event.target.value)} className="mt-1.5 w-full rounded-lg border border-line px-3 py-2.5" />
             </label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={price}
-              onChange={(event) => setPrice(event.target.value)}
-              className="mt-1.5 w-full rounded-lg bg-canvas px-3 py-2 text-sm text-ink outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium tracking-wide text-muted uppercase">
-              Condition
+            <label className="block text-sm">Condition
+              <select value={condition} onChange={(event) => setCondition(event.target.value as Doc<"listings">["condition"])} className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3 py-2.5">
+                {CONDITIONS.map((value) => <option key={value} value={value}>{value.replace(/_/g, " ").replace(/^./, (char) => char.toUpperCase())}</option>)}
+              </select>
             </label>
-            <select
-              value={condition}
-              onChange={(event) =>
-                setCondition(event.target.value as Doc<"listings">["condition"])
-              }
-              className="mt-1.5 w-full rounded-lg bg-canvas px-3 py-2 text-sm text-ink outline-none"
-            >
-              {CONDITIONS.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
           </div>
+          <label className="block text-sm">Description
+            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} className="mt-1.5 w-full resize-y rounded-lg border border-line px-3 py-2.5" />
+          </label>
+        </fieldset>
+        {item.researchSources && item.researchSources.length > 0 && <details className="mt-4 border-t border-line pt-4">
+          <summary className="cursor-pointer text-xs text-muted">How this price was estimated</summary>
+          <ul className="mt-3 space-y-3">{item.researchSources.map((source, index) => <li key={index} className="text-xs"><p className="font-medium">{source.source} · {source.price}</p><p className="mt-1 text-muted">{source.description}</p></li>)}</ul>
+        </details>}
+        {!editable && listing.status !== "publishing" && <details className="mt-4 border-t border-line pt-4"><summary className="cursor-pointer text-sm">Offers & activity</summary><AgentTab listing={listing} /></details>}
+        {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
+        <div className="sticky bottom-0 mt-5 flex justify-end gap-2 border-t border-line bg-surface py-4">
+          <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>{editable ? "Cancel" : "Done"}</Button>
+          {editable && <Button type="submit" disabled={busy}>{busy ? <><Loader2 className="animate-spin" />Saving…</> : "Save changes"}</Button>}
         </div>
-
-        <label className="mt-4 block text-xs font-medium tracking-wide text-muted uppercase">
-          Description
-        </label>
-        <textarea
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          rows={4}
-          className="mt-1.5 w-full resize-none rounded-lg bg-canvas px-3 py-2 text-sm text-ink outline-none"
-        />
-
-        <details
-          open={researchOpen}
-          onToggle={(event) => setResearchOpen(event.currentTarget.open)}
-          className="mt-4 border-t border-line pt-4"
-        >
-          <summary className="cursor-pointer text-xs font-medium tracking-wide text-muted uppercase">
-            Research summary
-          </summary>
-          <div className="mt-2 space-y-2 text-sm">
-            {item.identification && (
-              <p className="text-ink-soft">
-                {item.identification.confidence} confidence
-                {(item.identification.brand || item.identification.model) &&
-                  ` · ${[item.identification.brand, item.identification.model].filter(Boolean).join(" ")}`}
-              </p>
-            )}
-            {item.estimatedLow !== undefined && item.estimatedHigh !== undefined && (
-              <p className="text-ink-soft">
-                Estimated resale ${item.estimatedLow}–${item.estimatedHigh}
-              </p>
-            )}
-            {item.researchSources?.map((source, index) => (
-              <div key={index} className="rounded-lg bg-canvas px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-ink">{source.source}</span>
-                  <span className="text-xs font-medium text-ink">{source.price}</span>
-                </div>
-                <p className="mt-0.5 text-xs text-muted">{source.description}</p>
-              </div>
-            ))}
-          </div>
-        </details>
-
-        {listing.status === "live" || listing.status === "sold" || listing.status === "ended" ? (
-          <div className="mt-5 border-t border-line pt-4">
-            <p className="text-sm text-ink-soft">{title}</p>
-            <p className="mt-1 text-sm text-muted">
-              ${listing.price} · {listing.condition.replace(/_/g, " ")}
-            </p>
-            {listing.ebayListingUrl && (
-              <a
-                href={listing.ebayListingUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-block rounded-full bg-canvas px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-line"
-              >
-                View on eBay
-              </a>
-            )}
-          </div>
-        ) : listing.status === "failed" ? (
-          <div className="mt-5 border-t border-line pt-4">
-            <p className="text-sm text-muted">
-              {listing.publishError ?? "Publishing failed for an unknown reason."}
-            </p>
-            <Button
-              variant="accent"
-              className="mt-3 w-full"
-              onClick={() => void publishListing({ listingId: listing._id, sessionId })}
-            >
-              Retry publish
-            </Button>
-          </div>
-        ) : (
-          <div className="mt-5 flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              disabled={listing.status === "publishing"}
-              onClick={() => void updateListing(draft())}
-            >
-              Save
-            </Button>
-            <Button
-              variant="accent"
-              className="flex-1"
-              disabled={listing.status === "publishing"}
-              onClick={() => void approveListing(draft())}
-            >
-              {listing.status === "publishing" ? "Publishing…" : "Approve listing"}
-            </Button>
-          </div>
-        )}
-          </>
-        )}
-      </motion.aside>
-    </>
+      </form>
+    </dialog>
   );
 }
