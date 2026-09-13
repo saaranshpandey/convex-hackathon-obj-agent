@@ -18,9 +18,10 @@ type Props = {
   onBack: () => void;
   onSkip: (id: Id<"items">) => void;
   onNewPhoto: () => void;
+  onBusyChange: (busy: boolean) => void;
 };
 
-export default function SaleReview({ imageUrl, items, listings, sessionId, onEdit, onBack, onSkip, onNewPhoto }: Props) {
+export default function SaleReview({ imageUrl, items, listings, sessionId, onEdit, onBack, onSkip, onNewPhoto, onBusyChange }: Props) {
   const connection = useQuery(api.ebayAuth.connectionStatus, { sessionId });
   const approve = useMutation(api.listings.approve);
   const publish = useMutation(api.listingPublish.publish);
@@ -37,6 +38,7 @@ export default function SaleReview({ imageUrl, items, listings, sessionId, onEdi
     if (submitting.current || locked || !connection?.connected || flow.remaining.length === 0) return;
     submitting.current = true;
     setBusy(true);
+    onBusyChange(true);
     setError(null);
     try {
       const failures = await publishSelection(flow.remaining,
@@ -47,6 +49,7 @@ export default function SaleReview({ imageUrl, items, listings, sessionId, onEdi
     } finally {
       submitting.current = false;
       setBusy(false);
+      onBusyChange(false);
     }
   };
 

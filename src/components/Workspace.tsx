@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { AlertCircle, ArrowRight, Check, Loader2, Plus } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, Plus } from "lucide-react";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import type { Rect, WorkspaceItem } from "@/lib/geometry";
-import { saleFlow } from "@/lib/saleFlow";
+import { canPublish, saleFlow } from "@/lib/saleFlow";
+import WorkspaceTabs from "@/components/WorkspaceTabs";
 import PhotoCanvas from "@/components/PhotoCanvas";
 import ObjectThumb from "@/components/ObjectThumb";
 import SaleReview from "@/components/SaleReview";
@@ -43,12 +44,16 @@ export default function Workspace({
 }: Props) {
   const [choosing, setChoosing] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
   const flow = saleFlow(items, listings);
   const preparing = starting || flow.working;
   const reviewing = !choosing && flow.started && !preparing;
   const scanning = cleanout.status === "analyzing";
+  const selectionLocked = flow.included.some((listing) => !canPublish(listing));
+  const navigationLocked = publishing || flow.publishing;
+  const activeTab = reviewing || preparing ? "listings" : "items";
   const activeListing = flow.included.find((listing) => listing._id === reviewingListingId);
   const activeItem = items.find((item) => item._id === activeListing?.itemId);
 
@@ -90,20 +95,16 @@ export default function Workspace({
 
   return (
     <div className="mx-auto max-w-5xl pb-8 pt-8 sm:pt-12">
-      <ol aria-label="Sale progress" className="mb-8 flex justify-center gap-5 sm:gap-10">
-        {["Choose items", "Review", "Published"].map((label, index) => {
-          const step = flow.complete && !choosing ? 2 : reviewing || preparing ? 1 : 0;
-          return <li key={label} aria-current={step === index ? "step" : undefined} className={`flex items-center gap-2 text-xs ${step === index ? "font-medium text-ink" : "text-muted"}`}>
-            <span className={`flex size-6 items-center justify-center rounded-full text-[11px] ${step === index ? "bg-ink text-white" : "bg-line text-muted"}`}>{step > index ? <Check className="size-3" /> : index + 1}</span>{label}
-          </li>;
-        })}
-      </ol>
+      <WorkspaceTabs active={activeTab} itemsDisabled={preparing || navigationLocked}
+        listingsDisabled={!flow.started || scanning || drawing || navigationLocked}
+        onChange={(tab) => { setChoosing(tab === "items"); onCloseDrawer(); }} />
+      <section role="tabpanel" id={`sale-panel-${activeTab}`} aria-labelledby={`sale-tab-${activeTab}`} tabIndex={0}>
       <div className="mb-7 text-center">
         <h1 className="text-3xl font-semibold tracking-[-0.035em]">
-          {preparing ? "Preparing your listings" : reviewing ? flow.complete ? "You're all set" : "Review before publishing" : scanning ? "Finding your items" : "What would you like to sell?"}
+          {preparing ? "Preparing your listings" : reviewing ? flow.complete ? "You're all set" : "Review before publishing" : scanning ? "Finding your items" : selectionLocked ? "Your room" : "What would you like to sell?"}
         </h1>
         <p className="mt-2 text-sm text-muted">
-          {preparing ? "Finding prices and writing the details. Nothing is published yet." : reviewing ? flow.complete ? "Manage your listings below." : "Check the prices. Edit anything you want." : scanning ? "This will only take a moment." : "Tap an item in the photo or choose it from the list."}
+          {preparing ? "Finding prices and writing the details. Nothing is published yet." : reviewing ? flow.complete ? "Manage your listings below." : "Check the prices. Edit anything you want." : scanning ? "This will only take a moment." : selectionLocked ? "View your items here. Manage them in Listings." : "Tap an item in the photo or choose it from the list."}
         </p>
       </div>
 
@@ -115,15 +116,15 @@ export default function Workspace({
       ) : reviewing ? (
         <SaleReview imageUrl={imageUrl} items={items} listings={listings} sessionId={sessionId}
           onEdit={onReviewListing} onBack={() => { setChoosing(true); onCloseDrawer(); }}
-          onSkip={onToggle} onNewPhoto={onNewPhoto} />
+          onSkip={onToggle} onNewPhoto={onNewPhoto} onBusyChange={setPublishing} />
       ) : (
         <>
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
             <div className="min-w-0">
               <PhotoCanvas imageUrl={imageUrl} items={items} scanning={scanning} scanLabel="Finding items…"
                 drawing={drawing} hoveredId={hoveredId} activeId={activeId}
-                onToggle={onToggle} onHover={onHover} onAddItem={onAddItem} onCancelDrawing={onToggleDrawing} />
-              {!scanning && <div className="mt-3 flex items-center justify-between">
+                onToggle={selectionLocked ? () => {} : onToggle} onHover={onHover} onAddItem={onAddItem} onCancelDrawing={onToggleDrawing} />
+              {!scanning && !selectionLocked && <div className="mt-3 flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={onToggleDrawing}><Plus />{drawing ? "Cancel selection" : "Add missing item"}</Button>
                 <Button variant="ghost" size="sm" onClick={onNewPhoto}>Change photo</Button>
               </div>}
@@ -131,17 +132,17 @@ export default function Workspace({
             {!scanning && <div className="rounded-2xl border border-line bg-surface p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-medium">{items.length} items found</h2>
-                <Button variant="ghost" size="sm" disabled={items.length === 0} onClick={flow.selected.length === items.length ? onClear : onSelectAll}>{flow.selected.length === items.length && items.length > 0 ? "Clear" : "Select all"}</Button>
+                {!selectionLocked && <Button variant="ghost" size="sm" disabled={items.length === 0} onClick={flow.selected.length === items.length ? onClear : onSelectAll}>{flow.selected.length === items.length && items.length > 0 ? "Clear" : "Select all"}</Button>}
               </div>
               {items.length === 0 && <p className="py-6 text-sm text-muted">No items found. Use “Add missing item” to select one in the photo.</p>}
               <ul className="space-y-1">{items.map((item) => (
                 <li key={item._id} onPointerEnter={() => onHover(item._id)} onPointerLeave={() => onHover(null)}>
                   <label className="flex cursor-pointer items-center gap-3 rounded-xl p-2 hover:bg-canvas">
-                    <input type="checkbox" checked={item.selected} onChange={() => onToggle(item._id)} className="size-4 shrink-0 accent-accent-deep" />
+                    <input type="checkbox" disabled={selectionLocked} checked={item.selected} onChange={() => onToggle(item._id)} className="size-4 shrink-0 accent-accent-deep" />
                     <ObjectThumb imageUrl={imageUrl} bbox={item.bbox} className="h-10 max-w-14" />
                     <span className="min-w-0 flex-1 text-sm">{item.name}</span>
                   </label>
-                  {item.source === "manual" && <details className="ml-9 text-xs text-muted">
+                  {item.source === "manual" && !selectionLocked && <details className="ml-9 text-xs text-muted">
                     <summary className="cursor-pointer py-1">Edit item</summary>
                     <input aria-label={`Rename ${item.name}`} defaultValue={item.name} key={item.name} onBlur={(event) => { if (event.target.value.trim()) onRename(item._id, event.target.value.trim()); }} className="my-2 w-full rounded border border-line px-2 py-1.5" />
                     <button className="mb-2 text-red-700" onClick={() => onRemove(item._id)}>Remove item</button>
@@ -154,14 +155,15 @@ export default function Workspace({
             {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <p className="text-sm text-muted">{flow.selected.length} {flow.selected.length === 1 ? "item" : "items"} selected</p>
-              <Button disabled={flow.selected.length === 0 || drawing} onClick={() => void prepare()}>
-                {flow.selected.length > 0 && flow.included.length === flow.selected.length ? "Review listings" : "Prepare listings"}<ArrowRight />
+              <Button disabled={flow.selected.length === 0 || drawing} onClick={() => selectionLocked ? setChoosing(false) : void prepare()}>
+                {selectionLocked ? "View listings" : flow.selected.length > 0 && flow.included.length === flow.selected.length ? "Review listings" : "Prepare listings"}<ArrowRight />
               </Button>
             </div>
-            <p className="mt-3 text-right text-xs text-muted">{flow.included.length > 0 && flow.included.length < flow.selected.length ? "Preparing again replaces existing drafts with fresh prices and details." : "Next: review prices and listing details."}</p>
+            {!selectionLocked && <p className="mt-3 text-right text-xs text-muted">{flow.included.length > 0 && flow.included.length < flow.selected.length ? "Preparing again replaces existing drafts with fresh prices and details." : "Next: review prices and listing details."}</p>}
           </div>}
         </>
       )}
+      </section>
 
       <AnimatePresence>
         {reviewing && activeListing && activeItem && (
