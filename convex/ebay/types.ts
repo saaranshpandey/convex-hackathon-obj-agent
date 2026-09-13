@@ -41,6 +41,9 @@ export type PublishInput = {
     /** From Phase 4 identification, when known — many categories require a
      * Brand item aspect before they'll let an offer publish. */
     brand?: string | null;
+    /** A short category-agnostic guess (Phase 4's identified category) for
+     * the "Type" aspect some categories also require. */
+    itemType?: string | null;
   };
 };
 

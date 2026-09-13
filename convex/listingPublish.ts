@@ -79,7 +79,12 @@ export const contextForPublish = internalQuery({
       ? await ctx.storage.getUrl(cleanout.imageStorageId)
       : null;
 
-    return { listing, imageUrl, brand: item.identification?.brand ?? null };
+    return {
+      listing,
+      imageUrl,
+      brand: item.identification?.brand ?? null,
+      itemType: item.identification?.category ?? null,
+    };
   },
 });
 
@@ -197,6 +202,7 @@ export const publishOne = internalAction({
           condition: context.listing.condition,
           imageUrl: context.imageUrl,
           brand: context.brand,
+          itemType: context.itemType,
         },
       });
 

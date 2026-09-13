@@ -70,57 +70,86 @@ export function createSandboxPublisher(env: EbayEnv): EbayPublisher {
 
       const sku = input.listing.sku;
 
-      // Many categories reject a publish without a Brand item aspect. "Type"
-      // and other category-specific aspects vary too widely to fill in
+      // Many categories reject a publish without Brand and Type item
+      // aspects. Other category-specific aspects vary too widely to fill in
       // generically here — a missing one still surfaces as a clear error.
       const brand = input.listing.brand ?? "Unbranded";
+      const itemType = input.listing.itemType ?? undefined;
+      const aspects = itemType ? { Brand: [brand], Type: [itemType] } : { Brand: [brand] };
 
-      await ebayRequest(env, input.accessToken, "PUT", `/sell/inventory/v1/inventory_item/${sku}`, {
-        condition: CONDITION_MAP[input.listing.condition],
-        product: {
-          title: input.listing.title,
-          description: input.listing.description,
-          imageUrls: [input.listing.imageUrl],
-          aspects: { Brand: [brand] },
-        },
-        // No real package dimensions are known at this stage — a generic
-        // small-parcel default so publish doesn't fail on a missing field.
-        packageWeightAndSize: {
-          weight: { value: 5, unit: "POUND" },
-          dimensions: { length: 12, width: 12, height: 12, unit: "INCH" },
-        },
-        availability: {
-          shipToLocationAvailability: { quantity: 1 },
-        },
-      });
+      const putInventoryItem = (condition: string) =>
+        ebayRequest(env, input.accessToken, "PUT", `/sell/inventory/v1/inventory_item/${sku}`, {
+          condition,
+          product: {
+            title: input.listing.title,
+            description: input.listing.description,
+            imageUrls: [input.listing.imageUrl],
+            aspects,
+          },
+          // No real package dimensions are known at this stage — a generic
+          // small-parcel default so publish doesn't fail on a missing field.
+          packageWeightAndSize: {
+            weight: { value: 5, unit: "POUND" },
+            dimensions: { length: 12, width: 12, height: 12, unit: "INCH" },
+          },
+          availability: {
+            shipToLocationAvailability: { quantity: 1 },
+          },
+        });
 
-      const offer = await ebayRequest(env, input.accessToken, "POST", "/sell/inventory/v1/offer", {
-        sku,
-        marketplaceId: "EBAY_US",
-        format: "FIXED_PRICE",
-        availableQuantity: 1,
-        categoryId: input.categoryId,
-        listingDescription: input.listing.description,
-        pricingSummary: { price: { value: String(input.listing.price), currency: "USD" } },
-        listingPolicies: {
-          fulfillmentPolicyId: input.fulfillmentPolicyId,
-          paymentPolicyId: input.paymentPolicyId,
-          returnPolicyId: input.returnPolicyId,
-        },
-        merchantLocationKey: input.merchantLocationKey,
-      });
+      await putInventoryItem(CONDITION_MAP[input.listing.condition]);
 
-      const offerId = offer.offerId;
-      if (typeof offerId !== "string") {
-        throw new EbayError("eBay did not return an offer ID.");
+      let offerId: string;
+      try {
+        const offer = await ebayRequest(env, input.accessToken, "POST", "/sell/inventory/v1/offer", {
+          sku,
+          marketplaceId: "EBAY_US",
+          format: "FIXED_PRICE",
+          availableQuantity: 1,
+          categoryId: input.categoryId,
+          listingDescription: input.listing.description,
+          pricingSummary: { price: { value: String(input.listing.price), currency: "USD" } },
+          listingPolicies: {
+            fulfillmentPolicyId: input.fulfillmentPolicyId,
+            paymentPolicyId: input.paymentPolicyId,
+            returnPolicyId: input.returnPolicyId,
+          },
+          merchantLocationKey: input.merchantLocationKey,
+        });
+        if (typeof offer.offerId !== "string") {
+          throw new EbayError("eBay did not return an offer ID.");
+        }
+        offerId = offer.offerId;
+      } catch (error) {
+        // A prior attempt on this SKU got as far as creating an offer, then
+        // failed at a later step — eBay reports the existing offerId in the
+        // error itself, so reuse it instead of treating retry as impossible.
+        const existingOfferId =
+          error instanceof EbayError
+            ? /"name":\s*"offerId",\s*"value":\s*"(\d+)"/.exec(error.message)?.[1]
+            : undefined;
+        if (!existingOfferId) throw error;
+        offerId = existingOfferId;
       }
 
-      const published = await ebayRequest(
-        env,
-        input.accessToken,
-        "POST",
-        `/sell/inventory/v1/offer/${offerId}/publish`,
-      );
+      const publishOffer = () =>
+        ebayRequest(env, input.accessToken, "POST", `/sell/inventory/v1/offer/${offerId}/publish`);
+
+      let published: Record<string, unknown>;
+      try {
+        published = await publishOffer();
+      } catch (error) {
+        // errorId 25021: the mapped condition isn't valid for this specific
+        // category — allowed conditions vary a lot by category, with no
+        // single cheap lookup that covers all of them. Retry once with a
+        // condition value confirmed to be broadly accepted.
+        if (error instanceof EbayError && /"errorId":\s*25021/.test(error.message)) {
+          await putInventoryItem("USED_EXCELLENT");
+          published = await publishOffer();
+        } else {
+          throw error;
+        }
+      }
 
       const listingId = published.listingId;
       if (typeof listingId !== "string") {
