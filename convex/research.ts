@@ -15,13 +15,19 @@ import {
   researchStatus,
 } from "./schema";
 import { identifyItem, ResearchError, type IdentificationResult } from "./identify";
-import { priceItem } from "./priceResearch";
+import { priceItem, subjectFor, type PricingResult } from "./priceResearch";
 import { generateListing } from "./generateListing";
 
 /** How many items may be researched at once. Same bound as mask refinement. */
 const RESEARCH_CONCURRENCY = 4;
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [400, 1200];
+
+/** Same product identity priceResearch.ts builds its search queries from,
+ * normalised so "Sony DualSense" and "sony   dualsense" cache-hit alike. */
+function cacheKeyFor(identification: IdentificationResult): string {
+  return subjectFor(identification).trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 function isRetryable(error: unknown): boolean {
   if (!(error instanceof ResearchError)) return false;
@@ -195,6 +201,58 @@ export const savePricing = internalMutation({
   },
 });
 
+export const getCachedPricing = internalQuery({
+  args: { key: v.string() },
+  handler: async (ctx, args) => {
+    const cached = await ctx.db
+      .query("priceResearchCache")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .unique();
+    if (cached === null) return null;
+
+    return {
+      estimatedLow: cached.estimatedLow,
+      estimatedHigh: cached.estimatedHigh,
+      recommendedPrice: cached.recommendedPrice,
+      rationale: cached.rationale,
+      sources: cached.sources,
+    };
+  },
+});
+
+export const cachePricing = internalMutation({
+  args: {
+    key: v.string(),
+    estimatedLow: v.number(),
+    estimatedHigh: v.number(),
+    recommendedPrice: v.number(),
+    rationale: v.string(),
+    sources: v.array(researchSourceValidator),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("priceResearchCache")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .unique();
+
+    const fields = {
+      estimatedLow: args.estimatedLow,
+      estimatedHigh: args.estimatedHigh,
+      recommendedPrice: args.recommendedPrice,
+      rationale: args.rationale,
+      sources: args.sources,
+    };
+
+    if (existing !== null) {
+      await ctx.db.patch("priceResearchCache", existing._id, fields);
+    } else {
+      await ctx.db.insert("priceResearchCache", { ...fields, key: args.key, createdAt: Date.now() });
+    }
+
+    return null;
+  },
+});
+
 export const markResearchFailed = internalMutation({
   args: { itemId: v.id("items"), error: v.string() },
   handler: async (ctx, args) => {
@@ -291,14 +349,33 @@ export const researchCleanout = internalAction({
           identification,
         });
 
-        const pricing = await withRetry(() =>
-          priceItem({
-            firecrawlApiKey: firecrawlKey,
-            openaiApiKey: openaiKey,
-            model,
-            identification,
-          }),
+        const cacheKey = cacheKeyFor(identification);
+        const cached: PricingResult | null = await ctx.runQuery(
+          internal.research.getCachedPricing,
+          { key: cacheKey },
         );
+
+        const pricing =
+          cached ??
+          (await withRetry(() =>
+            priceItem({
+              firecrawlApiKey: firecrawlKey,
+              openaiApiKey: openaiKey,
+              model,
+              identification,
+            }),
+          ));
+
+        if (cached === null) {
+          await ctx.runMutation(internal.research.cachePricing, {
+            key: cacheKey,
+            estimatedLow: pricing.estimatedLow,
+            estimatedHigh: pricing.estimatedHigh,
+            recommendedPrice: pricing.recommendedPrice,
+            rationale: pricing.rationale,
+            sources: pricing.sources,
+          });
+        }
 
         await ctx.runMutation(internal.research.savePricing, {
           itemId: item._id,

@@ -267,6 +267,21 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_sessionId", ["sessionId"]),
 
+  /**
+   * Caches priceItem's result (Firecrawl search + pricing) by product
+   * identity, so re-researching the same product (a second unit in this
+   * cleanout, or a later one) skips the search and OpenAI pricing call.
+   */
+  priceResearchCache: defineTable({
+    key: v.string(),
+    estimatedLow: v.number(),
+    estimatedHigh: v.number(),
+    recommendedPrice: v.number(),
+    rationale: v.string(),
+    sources: v.array(researchSourceValidator),
+    createdAt: v.number(),
+  }).index("by_key", ["key"]),
+
   agentMessages: defineTable({
     listingId: v.id("listings"),
     /**

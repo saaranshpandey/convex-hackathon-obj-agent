@@ -32,11 +32,18 @@ export type PricingResult = {
 
 type SearchResult = { query: string; title: string; description: string; url: string };
 
-function buildQueries(identification: IdentificationResult): string[] {
-  const subject =
+/** The product identity a set of search queries (and the cache) are keyed
+ * on: brand + model when either is known, else the generic name. */
+export function subjectFor(identification: IdentificationResult): string {
+  return (
     [identification.brand, identification.model]
       .filter((v): v is string => !!v)
-      .join(" ") || identification.genericName;
+      .join(" ") || identification.genericName
+  );
+}
+
+function buildQueries(identification: IdentificationResult): string[] {
+  const subject = subjectFor(identification);
 
   return [
     `${subject} used price`,
