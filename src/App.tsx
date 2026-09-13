@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
@@ -174,7 +174,7 @@ export default function App() {
   const showEmptyState = workspace === null || composingNew;
 
   return (
-    <div className="min-h-dvh">
+    <MotionConfig reducedMotion="user"><div className="min-h-dvh">
       <TopNav
         onHome={() => {
           setDrawing(false);
@@ -185,7 +185,7 @@ export default function App() {
         isDemo={workspace?.cleanout.isDemo === true}
       />
 
-      <main className="mx-auto w-full max-w-[1600px] px-6 pb-16 sm:px-8">
+      <main className="mx-auto w-full max-w-[1320px] px-4 pb-6 sm:px-8">
         <AnimatePresence mode="wait">
           {workspace === undefined ? (
             <motion.div key="loading" exit={{ opacity: 0 }}>
@@ -279,6 +279,6 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
-    </div>
+    </div></MotionConfig>
   );
 }

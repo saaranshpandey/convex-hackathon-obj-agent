@@ -1,4 +1,4 @@
-import { RotateCcw, Scan } from "lucide-react";
+import { Plus, RotateCcw, Scan } from "lucide-react";
 import EbayConnectButton from "@/components/EbayConnectButton";
 
 type Props = {
@@ -14,25 +14,25 @@ export default function TopNav({
   onHome,
   isDemo = false, onReset, sessionId }: Props) {
   return (
-    <header className="sticky top-0 z-30 bg-canvas/85 backdrop-blur-sm">
-      <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between px-6 sm:px-8">
+    <header className="sticky top-0 z-30 border-b border-black/5 bg-canvas/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-[72px] w-full max-w-[1320px] items-center justify-between gap-3 px-4 sm:px-8">
         <button
           onClick={onHome}
           className="group flex items-center gap-2.5 rounded-full pr-2 text-left"
           aria-label="Start a new scan"
         >
-          <span className="flex size-7 items-center justify-center rounded-lg bg-ink text-canvas">
-            <Scan className="size-4" strokeWidth={2.25} />
+          <span className="flex size-9 items-center justify-center rounded-xl bg-ink text-white shadow-sm">
+            <Scan className="size-5" strokeWidth={1.75} />
           </span>
-          <span className="text-[15px] font-semibold tracking-[-0.01em] text-ink">
+          <span className="text-[18px] font-semibold tracking-[-0.04em] text-ink">
             Roomsale
           </span>
         </button>
 
-        <nav className="flex items-center gap-1">
+        <nav aria-label="Main navigation" className="flex items-center gap-1 sm:gap-3">
           {isDemo && (
             <span
-              title="This room's data is seeded so the full flow works offline"
+              title="You're exploring a room with sample data"
               className="mr-1 rounded-full bg-line px-2.5 py-1 text-[11px] font-medium tracking-wide text-muted uppercase"
             >
               Demo
@@ -41,21 +41,18 @@ export default function TopNav({
           {onReset && (
             <button
               onClick={onReset}
+              title="Reset demo data"
+              aria-label="Reset demo data"
               className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-ink/5 hover:text-ink"
             >
               <RotateCcw className="size-3.5" strokeWidth={2} />
-              Reset demo data
+              <span className="hidden lg:inline">Reset demo</span>
             </button>
           )}
           <EbayConnectButton sessionId={sessionId} />
-          <span className="hidden cursor-default rounded-full px-3.5 py-1.5 text-sm text-muted sm:inline">
-            Sales
-          </span>
-          <div
-            className="ml-2 size-8 rounded-full bg-line-strong ring-1 ring-line ring-inset"
-            role="img"
-            aria-label="Account"
-          />
+          <button onClick={onHome} aria-label="Start a new room" className="flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-medium text-ink shadow-sm ring-1 ring-black/5 transition-colors hover:bg-line sm:px-4">
+            <Plus className="size-3.5" /><span className="hidden sm:inline">New room</span>
+          </button>
         </nav>
       </div>
     </header>

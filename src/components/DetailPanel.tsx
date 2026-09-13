@@ -40,7 +40,7 @@ export default function DetailPanel({
   const active = items.find((item) => item._id === activeId) ?? null;
 
   return (
-    <aside className="surface p-5 lg:sticky lg:top-24 lg:self-start">
+    <aside aria-label="Sale details" className="surface p-6 ring-1 ring-black/[0.03] lg:sticky lg:top-24 lg:self-start">
       <AnimatePresence mode="wait" initial={false}>
         {active ? (
           <motion.div

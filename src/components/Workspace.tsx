@@ -1,5 +1,5 @@
 import { AnimatePresence } from "motion/react";
-import { AlertCircle, Loader2, SearchX } from "lucide-react";
+import { AlertCircle, Check, Loader2, Plus, SearchX } from "lucide-react";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 import type { Rect, WorkspaceItem } from "@/lib/geometry";
 import PhotoCanvas from "@/components/PhotoCanvas";
@@ -133,7 +133,21 @@ export default function Workspace({
     : -1;
 
   return (
-    <div className="space-y-5 pt-3">
+    <div className="space-y-6 pt-8 sm:pt-10">
+      <div className="flex flex-wrap items-center justify-between gap-5">
+        <div>
+          <p className="text-xs font-medium tracking-[0.12em] text-muted uppercase">Your selling workspace</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">A little space. A fresh start.</h1>
+          <p className="mt-2 text-sm text-muted">{scanning ? "Finding the possibilities in your photo." : `${items.length} items found. Choose what you're ready to let go.`}</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={onNewPhoto}><Plus />New photo</Button>
+      </div>
+      <ol aria-label="Sale progress" className="flex flex-wrap items-center gap-x-6 gap-y-3 border-y border-line py-4 sm:gap-10">
+        {["Select items", "Research prices", "Review listings"].map((label, index) => {
+          const currentStep = listings.length > 0 ? 2 : researching || items.some((item) => item.researchStatus) ? 1 : 0;
+          return <li key={label} aria-current={index === currentStep ? "step" : undefined} className={`flex items-center gap-2 text-xs ${index === currentStep ? "font-medium text-ink" : "text-muted"}`}><span className={`flex size-6 items-center justify-center rounded-full text-[10px] ${index === currentStep ? "bg-ink text-white" : index < currentStep ? "bg-accent text-accent-ink" : "bg-line text-muted"}`}>{index < currentStep ? <Check className="size-3" /> : `0${index + 1}`}</span>{label}</li>;
+        })}
+      </ol>
       <ResearchStatusBar items={items} />
       <div className="grid gap-7 lg:grid-cols-[minmax(0,2.05fr)_minmax(0,1fr)] lg:gap-8">
       <div className="min-w-0 space-y-5">

@@ -13,7 +13,7 @@ type Props = {
   onHover: (id: Id<"items"> | null) => void;
 };
 
-const LIME = "#B8F35A";
+const SELECTION_BLUE = "#2997FF";
 const NEUTRAL = "#FFFFFF";
 const EDGE_PX = 2;
 const FADE_MS = 320;
@@ -36,14 +36,14 @@ function maskStyle(selected: boolean, hovered: boolean): Style {
     return {
       fillAlpha: hovered ? 0.16 : 0.1,
       edgeAlpha: hovered ? 1 : 0.9,
-      edgeColor: LIME,
+      edgeColor: SELECTION_BLUE,
     };
   }
   return {
     // Deselected: no fill at rest, only the faintest neutral edge.
     fillAlpha: hovered ? 0.07 : 0,
     edgeAlpha: hovered ? 0.55 : 0.16,
-    edgeColor: hovered ? LIME : NEUTRAL,
+    edgeColor: hovered ? SELECTION_BLUE : NEUTRAL,
   };
 }
 
@@ -166,7 +166,7 @@ export default function ObjectCanvas({
           const style = maskStyle(item.selected, hovered);
 
           if (style.fillAlpha > 0) {
-            tintMask(entry.source, LIME);
+            tintMask(entry.source, SELECTION_BLUE);
             ctx.globalAlpha = style.fillAlpha * fade;
             ctx.drawImage(scratch, 0, 0, width, height);
           }
@@ -183,10 +183,10 @@ export default function ObjectCanvas({
           tintMask(entry.source, pickColor);
           pctx.drawImage(scratch, 0, 0, width, height);
         } else {
-          // Temporary detection state: a very thin lime box, minimal fill.
+          // Temporary detection state: a very thin blue box, minimal fill.
           const selected = item.selected;
           ctx.globalAlpha = 1;
-          ctx.fillStyle = LIME;
+          ctx.fillStyle = SELECTION_BLUE;
           // Trace the item's own polygon. For a box-only detection that
           // polygon IS the rectangle, so this is identical there — but a
           // pre-traced outline (demo room, mock provider) draws as a real
@@ -207,7 +207,7 @@ export default function ObjectCanvas({
           ctx.fill();
 
           ctx.globalAlpha = selected ? 0.9 : hovered ? 0.6 : 0.35;
-          ctx.strokeStyle = LIME;
+          ctx.strokeStyle = SELECTION_BLUE;
           ctx.lineWidth = 1;
           trace(ctx);
           ctx.stroke();

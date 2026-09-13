@@ -7,3 +7,5 @@ cache researched data
 remove noise from response in the email chat
 
 fix the UI transition from continue -> review -> approve listing -> monitor listing
+
+when click on approve listing something should happen next product or something
