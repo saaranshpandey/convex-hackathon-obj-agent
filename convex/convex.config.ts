@@ -36,11 +36,6 @@ const app = defineApp({
     EBAY_CLIENT_SECRET: v.optional(v.string()),
     /** eBay's opaque OAuth redirect identifier for this app + environment — not a URL. */
     EBAY_RU_NAME: v.optional(v.string()),
-    EBAY_MERCHANT_LOCATION_KEY: v.optional(v.string()),
-    EBAY_FULFILLMENT_POLICY_ID: v.optional(v.string()),
-    EBAY_PAYMENT_POLICY_ID: v.optional(v.string()),
-    EBAY_RETURN_POLICY_ID: v.optional(v.string()),
-    EBAY_CATEGORY_ID: v.optional(v.string()),
 
     /** Owner communication (never the eBay buyer-messaging channel). */
     AGENTMAIL_API_KEY: v.optional(v.string()),

@@ -8,10 +8,14 @@ import {
 import { internal } from "./_generated/api";
 import { env } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { requireOwnedCleanout, requireOwnedListing } from "./access";
-import { EbayError, getEbayMode, getEbayPublisher } from "./ebay";
-import { refreshAccessToken } from "./ebay/oauth";
+import type { IdentificationResult } from "./identify";
+import { EbayError, getEbayMode, getEbayPublisher, type PublishInput } from "./ebay";
+import { getAppAccessToken, refreshAccessToken } from "./ebay/oauth";
+import { locationKeyFor } from "./ebay/postalCode";
+import { resolveListingSpec } from "./ebay/prepare";
+import { ensureSellerSetup } from "./ebay/sellerSetup";
 
 /**
  * Publishing claims the job by flipping status to "publishing" inside the
@@ -85,8 +89,15 @@ export const contextForPublish = internalQuery({
     return {
       listing,
       imageUrl,
-      brand: item.identification?.brand ?? null,
-      itemType: item.identification?.category ?? null,
+      identification: item.identification ?? {
+        genericName: item.name,
+        brand: null,
+        model: null,
+        category: item.category,
+        condition: "unknown",
+        attributes: [],
+        confidence: "low" as const,
+      },
       detectionBox: item.detectionBox,
     };
   },
@@ -140,18 +151,20 @@ export const markPublishFailed = internalMutation({
   },
 });
 
-/** Returns null if this user has no eBay connection at all. */
+/** Returns null if this user has no usable connection for the current mode. */
 async function getValidAccessToken(
   ctx: ActionCtx,
   userId: Id<"users">,
-): Promise<{ accessToken: string; mode: string } | null> {
+): Promise<{ accessToken: string; mode: string; connection: Doc<"ebayConnections"> } | null> {
   const connection = await ctx.runQuery(internal.ebayAuth.connectionForUser, { userId });
   if (connection === null || connection.mode !== getEbayMode()) return null;
-  if (connection.mode === "mock") return { accessToken: connection.accessToken, mode: "mock" };
+  if (connection.mode === "mock") {
+    return { accessToken: connection.accessToken, mode: "mock", connection };
+  }
 
   // A minute of headroom avoids racing eBay's own expiry check.
   if (connection.accessTokenExpiresAt > Date.now() + 60_000) {
-    return { accessToken: connection.accessToken, mode: connection.mode };
+    return { accessToken: connection.accessToken, mode: connection.mode, connection };
   }
 
   const clientId = env.EBAY_CLIENT_ID?.trim();
@@ -175,7 +188,83 @@ async function getValidAccessToken(
     accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
   });
 
-  return { accessToken: refreshed.accessToken, mode: connection.mode };
+  return { accessToken: refreshed.accessToken, mode: connection.mode, connection };
+}
+
+type PublishContext = {
+  listing: Doc<"listings">;
+  identification: IdentificationResult;
+  detectionBox: { x: number; y: number; width: number; height: number };
+};
+
+type PublishBase = { sku: string; title: string; description: string; price: number };
+
+/**
+ * Everything a real eBay publish needs beyond the listing itself: the
+ * seller's own location and policies, and the item's category, condition and
+ * required details.
+ */
+async function buildSandboxInput(
+  ctx: ActionCtx,
+  userId: Id<"users">,
+  auth: { accessToken: string; connection: Doc<"ebayConnections"> },
+  context: PublishContext,
+  imageUrl: string,
+  base: PublishBase,
+): Promise<PublishInput> {
+  const postalCode = auth.connection.shipFromPostalCode;
+  if (postalCode === undefined) {
+    throw new Error(
+      "Reconnect eBay and enter your ZIP code — it's needed to set up your shipping location.",
+    );
+  }
+
+  let setup = auth.connection.sellerSetup;
+  if (setup === undefined || setup.locationKey !== locationKeyFor(postalCode)) {
+    setup = await ensureSellerSetup({ env: "sandbox", accessToken: auth.accessToken, postalCode });
+    await ctx.runMutation(internal.ebayAuth.saveSellerSetup, { userId, sellerSetup: setup });
+  }
+
+  const clientId = env.EBAY_CLIENT_ID?.trim();
+  const clientSecret = env.EBAY_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) {
+    throw new EbayError("EBAY_CLIENT_ID / EBAY_CLIENT_SECRET are not set in the Convex environment.");
+  }
+  const openaiApiKey = env.OPENAI_API_KEY?.trim();
+  if (!openaiApiKey) throw new Error("OPENAI_API_KEY is not set in the Convex environment.");
+
+  const appToken = await getAppAccessToken({ env: "sandbox", clientId, clientSecret });
+  const spec = await resolveListingSpec({
+    env: "sandbox",
+    appToken,
+    openaiApiKey,
+    model: env.OPENAI_VISION_MODEL?.trim() || undefined,
+    facts: context.identification,
+    title: context.listing.title,
+    description: context.listing.description,
+    condition: context.listing.condition,
+  });
+
+  const productImageUrl: string = await ctx.runAction(internal.imageCrop.cropToBox, {
+    imageUrl,
+    box: context.detectionBox,
+  });
+
+  return {
+    accessToken: auth.accessToken,
+    env: "sandbox",
+    categoryId: spec.categoryId,
+    merchantLocationKey: setup.locationKey,
+    fulfillmentPolicyId: setup.fulfillmentPolicyId,
+    paymentPolicyId: setup.paymentPolicyId,
+    returnPolicyId: setup.returnPolicyId,
+    listing: {
+      ...base,
+      imageUrl: productImageUrl,
+      ebayCondition: spec.ebayCondition,
+      aspects: spec.aspects,
+    },
+  };
 }
 
 export const publishOne = internalAction({
@@ -189,39 +278,25 @@ export const publishOne = internalAction({
       if (context.imageUrl === null) {
         throw new Error("The source photo could not be read from storage.");
       }
+      const imageUrl = context.imageUrl;
 
       const auth = await getValidAccessToken(ctx, args.userId);
       if (auth === null) throw new Error("Connect your eBay account before publishing.");
 
-      // Mock mode never looks at the image — skip the crop so it stays free.
-      const productImageUrl: string =
-        getEbayMode() === "mock"
-          ? context.imageUrl
-          : await ctx.runAction(internal.imageCrop.cropToBox, {
-              imageUrl: context.imageUrl,
-              box: context.detectionBox,
-            });
+      const base: PublishBase = {
+        sku: context.listing._id,
+        title: context.listing.title,
+        description: context.listing.description,
+        price: context.listing.price,
+      };
 
-      const publisher = getEbayPublisher();
-      const result = await publisher.publish({
-        accessToken: auth.accessToken,
-        env: "sandbox",
-        merchantLocationKey: env.EBAY_MERCHANT_LOCATION_KEY?.trim(),
-        fulfillmentPolicyId: env.EBAY_FULFILLMENT_POLICY_ID?.trim(),
-        paymentPolicyId: env.EBAY_PAYMENT_POLICY_ID?.trim(),
-        returnPolicyId: env.EBAY_RETURN_POLICY_ID?.trim(),
-        categoryId: env.EBAY_CATEGORY_ID?.trim(),
-        listing: {
-          sku: context.listing._id,
-          title: context.listing.title,
-          description: context.listing.description,
-          price: context.listing.price,
-          condition: context.listing.condition,
-          imageUrl: productImageUrl,
-          brand: context.brand,
-          itemType: context.itemType,
-        },
-      });
+      // Demo mode never looks at the image or eBay, so it stays free.
+      const input: PublishInput =
+        auth.mode === "mock"
+          ? { accessToken: auth.accessToken, env: "sandbox", listing: { ...base, imageUrl } }
+          : await buildSandboxInput(ctx, args.userId, auth, context, imageUrl, base);
+
+      const result = await getEbayPublisher().publish(input);
 
       await ctx.runMutation(internal.listingPublish.markPublished, {
         listingId: args.listingId,

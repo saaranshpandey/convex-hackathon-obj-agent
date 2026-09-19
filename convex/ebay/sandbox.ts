@@ -1,46 +1,41 @@
 /**
  * Real eBay Sell Inventory API flow: createOrReplaceInventoryItem, then
- * createOffer, then publishOffer. Each stage's required fields (business
- * policies, merchant location, category) come from Convex env — this app
- * doesn't look them up dynamically, so a clear error names exactly what's
- * missing rather than failing deep inside an eBay request.
+ * createOffer, then publishOffer. The seller's location and policies, the
+ * category, the condition and the item details are resolved by the caller
+ * (see ebay/sellerSetup.ts and ebay/prepare.ts); this file only talks to the
+ * Inventory API.
  */
 
-import { EbayError, type EbayEnv, type EbayPublisher, type PublishInput } from "./types";
 import { ebayRequest } from "./http";
-
-const CONDITION_MAP: Record<PublishInput["listing"]["condition"], string> = {
-  new: "NEW",
-  like_new: "LIKE_NEW",
-  good: "USED_GOOD",
-  fair: "USED_ACCEPTABLE",
-  poor: "USED_ACCEPTABLE",
-};
+import { EbayError, type EbayEnv, type EbayPublisher } from "./types";
 
 export function createSandboxPublisher(env: EbayEnv): EbayPublisher {
   return {
     name: env,
     async publish(input) {
-      if (!input.merchantLocationKey) {
-        throw new EbayError("EBAY_MERCHANT_LOCATION_KEY is not set in the Convex environment.");
-      }
-      if (!input.fulfillmentPolicyId || !input.paymentPolicyId || !input.returnPolicyId) {
+      const {
+        categoryId,
+        merchantLocationKey,
+        fulfillmentPolicyId,
+        paymentPolicyId,
+        returnPolicyId,
+      } = input;
+      const { ebayCondition, aspects } = input.listing;
+      if (
+        !categoryId ||
+        !merchantLocationKey ||
+        !fulfillmentPolicyId ||
+        !paymentPolicyId ||
+        !returnPolicyId ||
+        !ebayCondition ||
+        !aspects
+      ) {
         throw new EbayError(
-          "EBAY_FULFILLMENT_POLICY_ID, EBAY_PAYMENT_POLICY_ID and EBAY_RETURN_POLICY_ID must all be set — create business policies in your eBay Seller Hub first.",
+          "The eBay publisher was called without a category, seller setup, condition or item details.",
         );
-      }
-      if (!input.categoryId) {
-        throw new EbayError("EBAY_CATEGORY_ID is not set in the Convex environment.");
       }
 
       const sku = input.listing.sku;
-
-      // Many categories reject a publish without Brand and Type item
-      // aspects. Other category-specific aspects vary too widely to fill in
-      // generically here — a missing one still surfaces as a clear error.
-      const brand = input.listing.brand ?? "Unbranded";
-      const itemType = input.listing.itemType ?? undefined;
-      const aspects = itemType ? { Brand: [brand], Type: [itemType] } : { Brand: [brand] };
 
       const putInventoryItem = (condition: string) =>
         ebayRequest(env, input.accessToken, "PUT", `/sell/inventory/v1/inventory_item/${sku}`, {
@@ -62,7 +57,7 @@ export function createSandboxPublisher(env: EbayEnv): EbayPublisher {
           },
         });
 
-      await putInventoryItem(CONDITION_MAP[input.listing.condition]);
+      await putInventoryItem(ebayCondition);
 
       let offerId: string;
       try {
@@ -71,15 +66,11 @@ export function createSandboxPublisher(env: EbayEnv): EbayPublisher {
           marketplaceId: "EBAY_US",
           format: "FIXED_PRICE",
           availableQuantity: 1,
-          categoryId: input.categoryId,
+          categoryId,
           listingDescription: input.listing.description,
           pricingSummary: { price: { value: String(input.listing.price), currency: "USD" } },
-          listingPolicies: {
-            fulfillmentPolicyId: input.fulfillmentPolicyId,
-            paymentPolicyId: input.paymentPolicyId,
-            returnPolicyId: input.returnPolicyId,
-          },
-          merchantLocationKey: input.merchantLocationKey,
+          listingPolicies: { fulfillmentPolicyId, paymentPolicyId, returnPolicyId },
+          merchantLocationKey,
         });
         if (typeof offer.offerId !== "string") {
           throw new EbayError("eBay did not return an offer ID.");
@@ -104,10 +95,9 @@ export function createSandboxPublisher(env: EbayEnv): EbayPublisher {
       try {
         published = await publishOffer();
       } catch (error) {
-        // errorId 25021: the mapped condition isn't valid for this specific
-        // category — allowed conditions vary a lot by category, with no
-        // single cheap lookup that covers all of them. Retry once with a
-        // condition value confirmed to be broadly accepted.
+        // errorId 25021: the chosen condition isn't valid for this category.
+        // The category lookup normally prevents this; retry once with plain
+        // "Used", which every category we have seen accepts.
         if (error instanceof EbayError && /"errorId":\s*25021/.test(error.message)) {
           await putInventoryItem("USED_EXCELLENT");
           published = await publishOffer();

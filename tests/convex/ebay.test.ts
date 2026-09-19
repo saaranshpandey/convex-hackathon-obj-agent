@@ -237,3 +237,39 @@ describe("the seller's ZIP code", () => {
     expect(connection?.shipFromPostalCode).toBe("94105");
   });
 });
+
+describe("publishing in sandbox mode needs the seller's ZIP", () => {
+  it("fails with a clear message when the connection has no ZIP", async () => {
+    const t = newTest();
+    const alice = await createUser(t, "alice@example.com");
+    const cleanoutId = await alice.as.mutation(api.cleanouts.start, { title: "Alice room" });
+    const storageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(["x"])));
+    await t.run(async (ctx) => {
+      await ctx.db.patch("cleanouts", cleanoutId, { imageStorageId: storageId });
+      const now = Date.now();
+      await ctx.db.insert("ebayConnections", {
+        userId: alice.userId,
+        accessToken: "token",
+        refreshToken: "refresh",
+        accessTokenExpiresAt: now + 3_600_000,
+        mode: "sandbox",
+        connectedAt: now,
+        updatedAt: now,
+      });
+    });
+    const listingId = await seedListing(t, cleanoutId, await seedItem(t, cleanoutId), "publishing");
+
+    process.env.EBAY_MODE = "sandbox";
+    try {
+      await t.action(internal.listingPublish.publishOne, { listingId, userId: alice.userId });
+    } finally {
+      delete process.env.EBAY_MODE;
+    }
+
+    const listing = await t.run(async (ctx) => await ctx.db.get("listings", listingId));
+    expect(listing?.status).toBe("failed");
+    expect(listing?.publishError).toBe(
+      "Reconnect eBay and enter your ZIP code — it's needed to set up your shipping location.",
+    );
+  });
+});

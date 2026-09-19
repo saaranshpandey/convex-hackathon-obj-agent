@@ -35,14 +35,9 @@ type Env = {
   readonly AGENTMAIL_WEBHOOK_SECRET: string | undefined;
   readonly DEMO_MODE: string | undefined;
   readonly EBAY_ACTIVITY_MODE: string | undefined;
-  readonly EBAY_CATEGORY_ID: string | undefined;
   readonly EBAY_CLIENT_ID: string | undefined;
   readonly EBAY_CLIENT_SECRET: string | undefined;
-  readonly EBAY_FULFILLMENT_POLICY_ID: string | undefined;
-  readonly EBAY_MERCHANT_LOCATION_KEY: string | undefined;
   readonly EBAY_MODE: string | undefined;
-  readonly EBAY_PAYMENT_POLICY_ID: string | undefined;
-  readonly EBAY_RETURN_POLICY_ID: string | undefined;
   readonly EBAY_RU_NAME: string | undefined;
   readonly FAL_KEY: string | undefined;
   readonly FAL_MASK_MODEL: string | undefined;

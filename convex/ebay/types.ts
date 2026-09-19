@@ -36,24 +36,21 @@ export type SellerSetup = {
 export type PublishInput = {
   accessToken: string;
   env: EbayEnv;
+  categoryId?: string;
   merchantLocationKey?: string;
   fulfillmentPolicyId?: string;
   paymentPolicyId?: string;
   returnPolicyId?: string;
-  categoryId?: string;
   listing: {
     sku: string;
     title: string;
     description: string;
     price: number;
-    condition: "new" | "like_new" | "good" | "fair" | "poor";
     imageUrl: string;
-    /** From Phase 4 identification, when known — many categories require a
-     * Brand item aspect before they'll let an offer publish. */
-    brand?: string | null;
-    /** A short category-agnostic guess (Phase 4's identified category) for
-     * the "Type" aspect some categories also require. */
-    itemType?: string | null;
+    /** Already-resolved eBay condition enum for this category. */
+    ebayCondition?: string;
+    /** Already-resolved required item details for this category. */
+    aspects?: Record<string, string[]>;
   };
 };
 
