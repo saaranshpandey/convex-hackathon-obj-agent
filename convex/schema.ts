@@ -68,6 +68,13 @@ export const researchSourceValidator = v.object({
   url: v.string(),
 });
 
+export const sellerSetupValidator = v.object({
+  locationKey: v.string(),
+  fulfillmentPolicyId: v.string(),
+  paymentPolicyId: v.string(),
+  returnPolicyId: v.string(),
+});
+
 export const listingStatus = v.union(
   v.literal("draft"),
   v.literal("approved"),
@@ -267,6 +274,10 @@ export default defineSchema({
     mode: v.string(),
     connectedAt: v.number(),
     updatedAt: v.number(),
+    /** Where this seller ships from; used to create their own eBay location. */
+    shipFromPostalCode: v.optional(v.string()),
+    /** The seller's own location and policy IDs, once they have been created. */
+    sellerSetup: v.optional(sellerSetupValidator),
   }).index("by_userId", ["userId"]),
 
   /** One-time codes that carry a signed-in user through eBay's OAuth redirect. */
@@ -274,6 +285,8 @@ export default defineSchema({
     nonce: v.string(),
     userId: v.id("users"),
     expiresAt: v.number(),
+    /** The ZIP the seller entered before being sent to eBay. */
+    postalCode: v.optional(v.string()),
   }).index("by_nonce", ["nonce"]),
 
   /**

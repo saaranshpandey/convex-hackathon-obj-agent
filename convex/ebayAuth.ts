@@ -4,7 +4,9 @@ import { env } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireUserId } from "./access";
+import { sellerSetupValidator } from "./schema";
 import { buildAuthorizeUrl } from "./ebay/oauth";
+import { isValidPostalCode } from "./ebay/postalCode";
 import { getEbayMode } from "./ebay";
 import { consumeOauthState, issueOauthState } from "./ebay/oauthState";
 
@@ -17,6 +19,7 @@ async function upsertConnection(
     accessTokenExpiresAt: number;
     refreshTokenExpiresAt?: number;
     mode: string;
+    shipFromPostalCode?: string;
   },
 ) {
   const existing = await ctx.db
@@ -37,8 +40,8 @@ async function upsertConnection(
 /** Mock mode connects instantly (no OAuth). Sandbox mode returns the
  * consent URL for the client to open in a popup. */
 export const connect = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { postalCode: v.optional(v.string()) },
+  handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const mode = getEbayMode();
 
@@ -54,6 +57,11 @@ export const connect = mutation({
       return { mode: "mock" as const, authorizeUrl: null };
     }
 
+    const postalCode = args.postalCode?.trim();
+    if (postalCode === undefined || !isValidPostalCode(postalCode)) {
+      throw new Error("Enter a valid US ZIP code (for example 94105).");
+    }
+
     const clientId = env.EBAY_CLIENT_ID?.trim();
     const ruName = env.EBAY_RU_NAME?.trim();
     if (!clientId || !ruName) {
@@ -62,7 +70,7 @@ export const connect = mutation({
       );
     }
 
-    const state = await issueOauthState(ctx, userId);
+    const state = await issueOauthState(ctx, userId, postalCode);
     const authorizeUrl = buildAuthorizeUrl({ env: "sandbox", clientId, ruName, state });
 
     return { mode: "sandbox" as const, authorizeUrl };
@@ -82,9 +90,24 @@ export const saveConnection = internalMutation({
     accessTokenExpiresAt: v.number(),
     refreshTokenExpiresAt: v.optional(v.number()),
     mode: v.string(),
+    shipFromPostalCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await upsertConnection(ctx, args);
+    return null;
+  },
+});
+
+export const saveSellerSetup = internalMutation({
+  args: { userId: v.id("users"), sellerSetup: sellerSetupValidator },
+  handler: async (ctx, args) => {
+    const connection = await ctx.db
+      .query("ebayConnections")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .unique();
+    if (connection === null) return null;
+
+    await ctx.db.patch("ebayConnections", connection._id, { sellerSetup: args.sellerSetup });
     return null;
   },
 });
@@ -98,10 +121,21 @@ export const connectionStatus = query({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
 
-    // A demo connection can't publish to real eBay (or the reverse), so after a
-    // mode switch the user is asked to connect again instead of failing later.
-    const usable = connection !== null && connection.mode === getEbayMode();
-    return { connected: usable, mode: usable ? connection.mode : null };
+    const configuredMode = getEbayMode();
+    // A demo connection can't publish to real eBay (or the reverse), and a real
+    // one needs the seller's ZIP, so after a mode switch or for an older
+    // connection the user is asked to connect again instead of failing later.
+    const usable =
+      connection !== null &&
+      connection.mode === configuredMode &&
+      (configuredMode === "mock" || connection.shipFromPostalCode !== undefined);
+
+    return {
+      connected: usable,
+      mode: usable ? connection.mode : null,
+      configuredMode,
+      shipFromPostalCode: connection?.shipFromPostalCode ?? null,
+    };
   },
 });
 

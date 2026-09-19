@@ -48,10 +48,9 @@ http.route({
     if (oauthError) return page(false, oauthError);
     if (!code || !state) return page(false, "Missing authorization code.");
 
-    const userId: Id<"users"> | null = await ctx.runMutation(internal.ebayAuth.consumeState, {
-      nonce: state,
-    });
-    if (userId === null) {
+    const pending: { userId: Id<"users">; postalCode: string | null } | null =
+      await ctx.runMutation(internal.ebayAuth.consumeState, { nonce: state });
+    if (pending === null) {
       return page(false, "This connection link is invalid or has expired. Please try again.");
     }
 
@@ -72,12 +71,13 @@ http.route({
       });
 
       await ctx.runMutation(internal.ebayAuth.saveConnection, {
-        userId,
+        userId: pending.userId,
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         accessTokenExpiresAt: tokens.accessTokenExpiresAt,
         refreshTokenExpiresAt: tokens.refreshTokenExpiresAt ?? undefined,
         mode: "sandbox",
+        shipFromPostalCode: pending.postalCode ?? undefined,
       });
 
       return page(true, "");
