@@ -2,10 +2,12 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { recordActivity } from "./activity";
+import { requireOwnedCleanout, requireUserId } from "./access";
 
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireUserId(ctx);
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -15,10 +17,12 @@ export const generateUploadUrl = mutation({
  * an "uploading" state instead of a blank screen while the photo travels.
  */
 export const start = mutation({
-  args: { sessionId: v.string(), title: v.string() },
+  args: { title: v.string() },
   handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+
     const cleanoutId = await ctx.db.insert("cleanouts", {
-      userId: args.sessionId,
+      userId,
       title: args.title,
       status: "uploading",
       selectedCount: 0,
@@ -44,6 +48,8 @@ export const attachImage = mutation({
     imageHeight: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireOwnedCleanout(ctx, args.cleanoutId);
+
     await ctx.db.patch("cleanouts", args.cleanoutId, {
       imageStorageId: args.storageId,
       imageWidth: args.imageWidth,
@@ -69,6 +75,8 @@ export const attachImage = mutation({
 export const markUploadFailed = mutation({
   args: { cleanoutId: v.id("cleanouts"), error: v.string() },
   handler: async (ctx, args) => {
+    await requireOwnedCleanout(ctx, args.cleanoutId);
+
     await ctx.db.patch("cleanouts", args.cleanoutId, {
       status: "failed",
       error: args.error,
@@ -88,8 +96,7 @@ export const markUploadFailed = mutation({
 export const retryAnalysis = mutation({
   args: { cleanoutId: v.id("cleanouts") },
   handler: async (ctx, args) => {
-    const cleanout = await ctx.db.get("cleanouts", args.cleanoutId);
-    if (cleanout === null) throw new Error("Cleanout not found");
+    const cleanout = await requireOwnedCleanout(ctx, args.cleanoutId);
     if (cleanout.imageStorageId === undefined) {
       throw new Error("This cleanout has no image to analyse");
     }
@@ -126,17 +133,17 @@ export const retryAnalysis = mutation({
 });
 
 /**
- * The whole workspace in one reactive read: the most recent cleanout for this
- * session, its signed image URL, and its items.
+ * The whole workspace in one reactive read: the caller's most recent cleanout,
+ * its signed image URL, and its items.
  */
-export const latestForSession = query({
-  args: { sessionId: v.string() },
-  handler: async (ctx, args) => {
+export const latestForUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+
     const cleanout = await ctx.db
       .query("cleanouts")
-      .withIndex("by_userId_and_createdAt", (q) =>
-        q.eq("userId", args.sessionId),
-      )
+      .withIndex("by_userId_and_createdAt", (q) => q.eq("userId", userId))
       .order("desc")
       .first();
 

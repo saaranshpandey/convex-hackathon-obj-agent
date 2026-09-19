@@ -1,18 +1,18 @@
-import { v } from "convex/values";
 import { mutation } from "./_generated/server";
+import { requireUserId } from "./access";
 
 /**
- * Developer helper: wipes everything belonging to one session, including the
- * stored images. Exposed in the UI only when running the dev server.
+ * Developer helper: wipes everything belonging to the signed-in user, including
+ * the stored images. Exposed in the UI only when running the dev server.
  */
 export const resetDemoData = mutation({
-  args: { sessionId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+
     const cleanouts = await ctx.db
       .query("cleanouts")
-      .withIndex("by_userId_and_createdAt", (q) =>
-        q.eq("userId", args.sessionId),
-      )
+      .withIndex("by_userId_and_createdAt", (q) => q.eq("userId", userId))
       .take(20);
 
     for (const cleanout of cleanouts) {
@@ -47,4 +47,3 @@ export const resetDemoData = mutation({
     return { deletedCleanouts: cleanouts.length };
   },
 });
-

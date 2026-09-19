@@ -9,6 +9,7 @@ import { internal } from "./_generated/api";
 import { env } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { recordActivity } from "./activity";
+import { requireOwnedCleanout } from "./access";
 import {
   identificationValidator,
   researchSourceValidator,
@@ -60,6 +61,8 @@ async function withRetry<T>(operation: () => Promise<T>): Promise<T> {
 export const startResearch = mutation({
   args: { cleanoutId: v.id("cleanouts") },
   handler: async (ctx, args) => {
+    const cleanout = await requireOwnedCleanout(ctx, args.cleanoutId);
+
     const items = await ctx.db
       .query("items")
       .withIndex("by_cleanoutId", (q) => q.eq("cleanoutId", args.cleanoutId))
@@ -89,8 +92,7 @@ export const startResearch = mutation({
 
     // A demo room runs the same stages against seeded data, so a judge sees the
     // whole flow even when the AI providers are down or out of credit.
-    const cleanout = await ctx.db.get("cleanouts", args.cleanoutId);
-    if (cleanout?.isDemo === true) {
+    if (cleanout.isDemo === true) {
       await ctx.scheduler.runAfter(0, internal.demo.simulateResearch, {
         cleanoutId: args.cleanoutId,
         itemIds: selected.map((item) => item._id),

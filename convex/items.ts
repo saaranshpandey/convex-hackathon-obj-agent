@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { recordActivity } from "./activity";
+import { requireOwnedCleanout, requireOwnedItem } from "./access";
 import { getMaskRefiner } from "./segmentation";
 
 const MAX_NAME_LENGTH = 80;
@@ -9,18 +10,13 @@ const MAX_NAME_LENGTH = 80;
 export const toggle = mutation({
   args: { itemId: v.id("items") },
   handler: async (ctx, args) => {
-    const item = await ctx.db.get("items", args.itemId);
-    if (item === null) throw new Error("Item not found");
+    const { item, cleanout } = await requireOwnedItem(ctx, args.itemId);
 
     const selected = !item.selected;
     await ctx.db.patch("items", item._id, { selected });
-
-    const cleanout = await ctx.db.get("cleanouts", item.cleanoutId);
-    if (cleanout !== null) {
-      await ctx.db.patch("cleanouts", cleanout._id, {
-        selectedCount: Math.max(0, cleanout.selectedCount + (selected ? 1 : -1)),
-      });
-    }
+    await ctx.db.patch("cleanouts", cleanout._id, {
+      selectedCount: Math.max(0, cleanout.selectedCount + (selected ? 1 : -1)),
+    });
 
     await recordActivity(ctx, {
       cleanoutId: item.cleanoutId,
@@ -36,6 +32,8 @@ export const toggle = mutation({
 export const setAll = mutation({
   args: { cleanoutId: v.id("cleanouts"), selected: v.boolean() },
   handler: async (ctx, args) => {
+    await requireOwnedCleanout(ctx, args.cleanoutId);
+
     const items = await ctx.db
       .query("items")
       .withIndex("by_cleanoutId", (q) => q.eq("cleanoutId", args.cleanoutId))
@@ -69,8 +67,7 @@ export const rename = mutation({
     const name = args.name.trim().slice(0, MAX_NAME_LENGTH);
     if (name.length === 0) throw new Error("An item needs a name");
 
-    const item = await ctx.db.get("items", args.itemId);
-    if (item === null) throw new Error("Item not found");
+    const { item } = await requireOwnedItem(ctx, args.itemId);
     if (item.name === name) return null;
 
     await ctx.db.patch("items", item._id, { name });
@@ -102,8 +99,7 @@ export const addManual = mutation({
     const name = args.name.trim().slice(0, MAX_NAME_LENGTH);
     if (name.length === 0) throw new Error("An item needs a name");
 
-    const cleanout = await ctx.db.get("cleanouts", args.cleanoutId);
-    if (cleanout === null) throw new Error("Cleanout not found");
+    const cleanout = await requireOwnedCleanout(ctx, args.cleanoutId);
 
     const { x, y, width, height } = args.boundingBox;
     if (width <= 0 || height <= 0) throw new Error("That box is empty");
@@ -164,11 +160,9 @@ export const addManual = mutation({
 export const remove = mutation({
   args: { itemId: v.id("items") },
   handler: async (ctx, args) => {
-    const item = await ctx.db.get("items", args.itemId);
-    if (item === null) return null;
+    const { item, cleanout } = await requireOwnedItem(ctx, args.itemId);
 
-    const cleanout = await ctx.db.get("cleanouts", item.cleanoutId);
-    if (cleanout !== null && item.selected) {
+    if (item.selected) {
       await ctx.db.patch("cleanouts", cleanout._id, {
         selectedCount: Math.max(0, cleanout.selectedCount - 1),
       });

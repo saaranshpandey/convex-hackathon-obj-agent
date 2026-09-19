@@ -3,6 +3,7 @@ import { query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { activityType } from "./schema";
+import { requireOwnedCleanout } from "./access";
 
 /**
  * Shared writer used by every mutation that should leave a trace. Not a Convex
@@ -23,6 +24,8 @@ export async function recordActivity(
 export const list = query({
   args: { cleanoutId: v.id("cleanouts") },
   handler: async (ctx, args) => {
+    await requireOwnedCleanout(ctx, args.cleanoutId);
+
     return await ctx.db
       .query("activity")
       .withIndex("by_cleanoutId_and_createdAt", (q) =>

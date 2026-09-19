@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { listingCondition } from "./schema";
+import { requireOwnedListing } from "./access";
 
 /** One listing per item — a fresh draft replaces whatever was there before. */
 export const saveDraft = internalMutation({
@@ -71,8 +72,7 @@ export const update = mutation({
     if (title.length === 0) throw new Error("A listing needs a title");
     if (args.price <= 0) throw new Error("Price must be greater than $0");
 
-    const listing = await ctx.db.get("listings", args.listingId);
-    if (listing === null) throw new Error("Listing not found");
+    await requireOwnedListing(ctx, args.listingId);
 
     await ctx.db.patch("listings", args.listingId, {
       title,
@@ -101,8 +101,7 @@ export const approve = mutation({
     if (title.length === 0) throw new Error("A listing needs a title");
     if (args.price <= 0) throw new Error("Price must be greater than $0");
 
-    const listing = await ctx.db.get("listings", args.listingId);
-    if (listing === null) throw new Error("Listing not found");
+    await requireOwnedListing(ctx, args.listingId);
 
     await ctx.db.patch("listings", args.listingId, {
       title,

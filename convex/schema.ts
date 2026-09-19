@@ -145,8 +145,8 @@ export const activityType = v.union(
 export default defineSchema({
   ...authTables,
   cleanouts: defineTable({
-    // Anonymous session id for now; becomes a real auth subject in a later phase.
-    userId: v.optional(v.string()),
+    /** The signed-in owner. Every room belongs to exactly one user. */
+    userId: v.id("users"),
     title: v.string(),
     // Absent only while the upload is still in flight.
     imageStorageId: v.optional(v.id("_storage")),

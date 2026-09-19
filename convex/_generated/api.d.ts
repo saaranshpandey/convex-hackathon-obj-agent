@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as access from "../access.js";
 import type * as activity from "../activity.js";
 import type * as agentMail from "../agentMail.js";
 import type * as agentMail_client from "../agentMail/client.js";
@@ -58,6 +59,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  access: typeof access;
   activity: typeof activity;
   agentMail: typeof agentMail;
   "agentMail/client": typeof agentMail_client;

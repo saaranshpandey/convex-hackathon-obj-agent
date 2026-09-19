@@ -13,6 +13,7 @@ import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { recordActivity } from "./activity";
+import { requireUserId } from "./access";
 import { MOCK_DETECTIONS } from "./mockDetection";
 import { DEMO_ITEMS } from "./demoData";
 
@@ -37,14 +38,15 @@ function boxOf(polygon: { x: number; y: number }[]) {
  */
 export const seedRoom = mutation({
   args: {
-    sessionId: v.string(),
     storageId: v.id("_storage"),
     imageWidth: v.optional(v.number()),
     imageHeight: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+
     const cleanoutId = await ctx.db.insert("cleanouts", {
-      userId: args.sessionId,
+      userId,
       title: "Demo room",
       imageStorageId: args.storageId,
       imageWidth: args.imageWidth,
