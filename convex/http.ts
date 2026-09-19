@@ -137,7 +137,20 @@ http.route({
       return new Response("ignored", { status: 200 });
     }
 
-    await ctx.runAction(internal.agentMail.handleInboundReply, { messageId, threadId, text });
+    const rawFrom = message?.from ?? message?.from_;
+    const from =
+      typeof rawFrom === "string"
+        ? rawFrom
+        : Array.isArray(rawFrom) && typeof rawFrom[0] === "string"
+          ? rawFrom[0]
+          : undefined;
+
+    await ctx.runAction(internal.agentMail.handleInboundReply, {
+      messageId,
+      threadId,
+      text,
+      from,
+    });
 
     return new Response("ok", { status: 200 });
   }),

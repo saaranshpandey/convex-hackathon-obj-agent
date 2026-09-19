@@ -43,3 +43,14 @@ export async function requireOwnedOffer(ctx: ReadCtx, offerId: Id<"offers">) {
   const { listing, cleanout } = await requireOwnedListing(ctx, offer.listingId);
   return { offer, listing, cleanout };
 }
+
+export async function ownerEmailForCleanout(
+  ctx: Pick<QueryCtx, "db">,
+  cleanoutId: Id<"cleanouts">,
+): Promise<string | null> {
+  const cleanout = await ctx.db.get("cleanouts", cleanoutId);
+  if (cleanout === null) return null;
+
+  const user = await ctx.db.get("users", cleanout.userId);
+  return user?.email ?? null;
+}

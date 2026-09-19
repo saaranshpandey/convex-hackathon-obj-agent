@@ -116,6 +116,10 @@ export const markPublished = internalMutation({
 
     await ctx.db.patch("items", listing.itemId, { status: "listed" });
 
+    await ctx.scheduler.runAfter(0, internal.agentMail.sendListingLiveEmail, {
+      listingId: args.listingId,
+    });
+
     return null;
   },
 });

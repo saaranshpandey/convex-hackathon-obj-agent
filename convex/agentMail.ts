@@ -12,7 +12,9 @@ import { pendingDecisionKind, pendingDecisionValidator } from "./schema";
 import { getOrCreateInbox, sendMessage } from "./agentMail/client";
 import { parseReply, type ParsedAction } from "./agentMail/parseReply";
 import { isValidAmount } from "./money";
-import { requireOwnedListing } from "./access";
+import { ownerEmailForCleanout, requireOwnedListing } from "./access";
+import { senderMatchesOwner } from "./agentMail/sender";
+import { listingLiveEmail } from "./agentMail/messages";
 
 const CONFIDENCE_THRESHOLD = 0.6;
 
@@ -69,7 +71,17 @@ export const contextForListing = internalQuery({
     const listing = await ctx.db.get("listings", args.listingId);
     if (listing === null) return null;
     const item = await ctx.db.get("items", listing.itemId);
-    return { listing, itemName: item?.name ?? listing.title };
+    const ownerEmail = await ownerEmailForCleanout(ctx, listing.cleanoutId);
+    return { listing, itemName: item?.name ?? listing.title, ownerEmail };
+  },
+});
+
+export const ownerEmailForListing = internalQuery({
+  args: { listingId: v.id("listings") },
+  handler: async (ctx, args) => {
+    const listing = await ctx.db.get("listings", args.listingId);
+    if (listing === null) return null;
+    return await ownerEmailForCleanout(ctx, listing.cleanoutId);
   },
 });
 
@@ -112,13 +124,16 @@ export const sendDecisionEmail = internalAction({
     offerId: v.optional(v.id("offers")),
   },
   handler: async (ctx, args) => {
-    const context: { listing: Doc<"listings">; itemName: string } | null = await ctx.runQuery(
-      internal.agentMail.contextForListing,
-      { listingId: args.listingId },
-    );
+    const context: {
+      listing: Doc<"listings">;
+      itemName: string;
+      ownerEmail: string | null;
+    } | null = await ctx.runQuery(internal.agentMail.contextForListing, {
+      listingId: args.listingId,
+    });
     if (context === null) return null;
 
-    const notifyEmail = env.USER_NOTIFY_EMAIL?.trim();
+    const notifyEmail = context.ownerEmail;
     const apiKey = env.AGENTMAIL_API_KEY?.trim();
     // Nothing to send to/from — the pending decision still shows in the UI.
     if (!notifyEmail || !apiKey) return null;
@@ -279,7 +294,12 @@ export const resolvePriceDrop = internalMutation({
 });
 
 export const handleInboundReply = internalAction({
-  args: { messageId: v.string(), threadId: v.string(), text: v.string() },
+  args: {
+    messageId: v.string(),
+    threadId: v.string(),
+    text: v.string(),
+    from: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const lookup: {
       duplicate: boolean;
@@ -292,6 +312,13 @@ export const handleInboundReply = internalAction({
 
     if (lookup.duplicate) return null;
     if (lookup.listing === null) return null;
+
+    const ownerEmail: string | null = await ctx.runQuery(
+      internal.agentMail.ownerEmailForListing,
+      { listingId: lookup.listing._id },
+    );
+    // Only the owner can act on their listing by email.
+    if (!senderMatchesOwner(args.from, ownerEmail)) return null;
 
     const listing = lookup.listing;
     const pending: PendingDecision | undefined = listing.pendingDecision;
@@ -369,7 +396,7 @@ export const handleInboundReply = internalAction({
           ? "I didn't quite catch that — reply with ACCEPT, COUNTER <amount>, or DECLINE."
           : "I didn't quite catch that — reply YES or KEEP.";
 
-      const notifyEmail = env.USER_NOTIFY_EMAIL?.trim();
+      const notifyEmail = ownerEmail;
       const mailKey = env.AGENTMAIL_API_KEY?.trim();
       if (notifyEmail && mailKey) {
         const inbox = await getOrCreateInbox(mailKey, env.AGENTMAIL_INBOX_ID?.trim());
@@ -387,6 +414,36 @@ export const handleInboundReply = internalAction({
         agentMailThreadId: args.threadId,
       });
     }
+
+    return null;
+  },
+});
+
+export const sendListingLiveEmail = internalAction({
+  args: { listingId: v.id("listings") },
+  handler: async (ctx, args) => {
+    const context: {
+      listing: Doc<"listings">;
+      itemName: string;
+      ownerEmail: string | null;
+    } | null = await ctx.runQuery(internal.agentMail.contextForListing, {
+      listingId: args.listingId,
+    });
+    if (context === null) return null;
+
+    const { listing, ownerEmail } = context;
+    const apiKey = env.AGENTMAIL_API_KEY?.trim();
+    if (!ownerEmail || !apiKey || !listing.ebayListingUrl) return null;
+
+    const { subject, text } = listingLiveEmail({
+      title: listing.title,
+      price: listing.price,
+      url: listing.ebayListingUrl,
+      mode: listing.publishMode ?? "mock",
+    });
+
+    const inbox = await getOrCreateInbox(apiKey, env.AGENTMAIL_INBOX_ID?.trim());
+    await sendMessage(apiKey, inbox.inboxId, { to: ownerEmail, subject, text });
 
     return null;
   },

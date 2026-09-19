@@ -47,8 +47,6 @@ const app = defineApp({
     AGENTMAIL_WEBHOOK_SECRET: v.optional(v.string()),
     /** Reuse an existing inbox instead of creating one (e.g. plan limit reached). */
     AGENTMAIL_INBOX_ID: v.optional(v.string()),
-    /** The single demo owner's real address — this app has no per-user email. */
-    USER_NOTIFY_EMAIL: v.optional(v.string()),
   },
 });
 
