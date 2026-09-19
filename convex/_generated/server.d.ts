@@ -52,7 +52,6 @@ type Env = {
   readonly OPENAI_REASONING_EFFORT: string | undefined;
   readonly OPENAI_VISION_MODEL: string | undefined;
   readonly SEGMENTATION_MODE: string | undefined;
-  readonly USER_NOTIFY_EMAIL: string | undefined;
 };
 
 /**
