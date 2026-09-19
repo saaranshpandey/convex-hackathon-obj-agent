@@ -141,3 +141,21 @@ export async function refreshAccessToken(input: {
     accessTokenExpiresAt: Date.now() + payload.expires_in * 1000,
   };
 }
+
+/** App-level token (no user consent) for lookups such as categories and rules. */
+export async function getAppAccessToken(input: {
+  env: EbayEnv;
+  clientId: string;
+  clientSecret: string;
+}): Promise<string> {
+  const payload = await postTokenRequest(
+    input.env,
+    input.clientId,
+    input.clientSecret,
+    new URLSearchParams({
+      grant_type: "client_credentials",
+      scope: "https://api.ebay.com/oauth/api_scope",
+    }),
+  );
+  return payload.access_token;
+}

@@ -23,6 +23,16 @@ export type EbayAccessToken = {
   accessTokenExpiresAt: number;
 };
 
+export type ListingCondition = "new" | "like_new" | "good" | "fair" | "poor";
+
+/** IDs of a seller's own shipping location and business policies. */
+export type SellerSetup = {
+  locationKey: string;
+  fulfillmentPolicyId: string;
+  paymentPolicyId: string;
+  returnPolicyId: string;
+};
+
 export type PublishInput = {
   accessToken: string;
   env: EbayEnv;

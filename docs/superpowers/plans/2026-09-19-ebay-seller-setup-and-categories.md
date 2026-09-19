@@ -206,6 +206,16 @@ export type FakeCall = { method: string; path: string; query: string; body: unkn
 export type FakeReply = { status: number; json?: unknown };
 export type FakeHandlers = Record<string, (call: FakeCall) => FakeReply>;
 
+/** JSON bodies are parsed; form-encoded ones (eBay's token endpoint) stay raw text. */
+function readBody(raw: unknown): unknown {
+  if (typeof raw !== "string" || raw === "") return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
 /**
  * Replaces global fetch with a router keyed by `<METHOD> <pathname>`. Any
  * unrouted request answers 599 so a missing handler fails loudly.
@@ -222,7 +232,7 @@ export function fakeEbay(handlers: FakeHandlers): FakeCall[] {
         method,
         path: url.pathname,
         query: url.search,
-        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        body: readBody(init?.body),
       };
       calls.push(call);
 
