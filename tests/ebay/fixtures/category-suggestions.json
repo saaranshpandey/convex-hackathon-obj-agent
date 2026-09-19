@@ -1,0 +1,19 @@
+{
+  "categorySuggestions": [
+    {
+      "category": { "categoryId": "80053", "categoryName": "Monitors" },
+      "categoryTreeNodeLevel": 3,
+      "categoryTreeNodeAncestors": [
+        { "categoryId": "162497", "categoryName": "Monitors, Projectors & Accs", "categoryTreeNodeLevel": 2 },
+        { "categoryId": "58058", "categoryName": "Computers/Tablets & Networking", "categoryTreeNodeLevel": 1 }
+      ]
+    },
+    {
+      "category": { "categoryId": "179", "categoryName": "PC Desktops & All-In-Ones" },
+      "categoryTreeNodeLevel": 3,
+      "categoryTreeNodeAncestors": []
+    }
+  ],
+  "categoryTreeId": "0",
+  "categoryTreeVersion": "131"
+}

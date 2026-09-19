@@ -1,0 +1,55 @@
+{
+  "aspects": [
+    {
+      "localizedAspectName": "Brand",
+      "aspectConstraint": {
+        "aspectDataType": "STRING",
+        "itemToAspectCardinality": "SINGLE",
+        "aspectMode": "FREE_TEXT",
+        "aspectRequired": true,
+        "aspectUsage": "RECOMMENDED",
+        "aspectEnabledForVariations": false,
+        "aspectApplicableTo": ["PRODUCT"]
+      },
+      "aspectValues": [{ "localizedValue": "Unbranded" }, { "localizedValue": "3G Technology" }]
+    },
+    {
+      "localizedAspectName": "Screen Size",
+      "aspectConstraint": {
+        "aspectDataType": "STRING",
+        "itemToAspectCardinality": "SINGLE",
+        "aspectMode": "FREE_TEXT",
+        "aspectRequired": true,
+        "aspectUsage": "RECOMMENDED",
+        "aspectEnabledForVariations": false,
+        "aspectApplicableTo": ["PRODUCT"]
+      }
+    },
+    {
+      "localizedAspectName": "Refresh Rate",
+      "aspectConstraint": {
+        "aspectDataType": "STRING",
+        "itemToAspectCardinality": "SINGLE",
+        "aspectMode": "SELECTION_ONLY",
+        "aspectRequired": true,
+        "aspectUsage": "RECOMMENDED",
+        "aspectEnabledForVariations": false,
+        "aspectApplicableTo": ["PRODUCT"]
+      },
+      "aspectValues": [{ "localizedValue": "60 Hz" }, { "localizedValue": "144 Hz" }]
+    },
+    {
+      "localizedAspectName": "Energy Star",
+      "aspectConstraint": {
+        "aspectDataType": "STRING",
+        "itemToAspectCardinality": "SINGLE",
+        "aspectMode": "SELECTION_ONLY",
+        "aspectRequired": false,
+        "aspectUsage": "RECOMMENDED",
+        "aspectEnabledForVariations": false,
+        "aspectApplicableTo": ["PRODUCT"]
+      },
+      "aspectValues": [{ "localizedValue": "1 Star" }, { "localizedValue": "2 Stars" }]
+    }
+  ]
+}

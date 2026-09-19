@@ -1,0 +1,16 @@
+{
+  "itemConditionPolicies": [
+    {
+      "categoryTreeId": "0",
+      "categoryId": "133705",
+      "itemConditionRequired": true,
+      "itemConditions": [
+        { "conditionId": "1000", "conditionDescription": "New" },
+        { "conditionId": "1500", "conditionDescription": "Open box" },
+        { "conditionId": "2500", "conditionDescription": "Seller refurbished" },
+        { "conditionId": "3000", "conditionDescription": "Used" },
+        { "conditionId": "7000", "conditionDescription": "For parts or not working" }
+      ]
+    }
+  ]
+}
