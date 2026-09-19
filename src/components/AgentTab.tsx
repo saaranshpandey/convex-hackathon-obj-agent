@@ -6,7 +6,6 @@ import OfferCard from "@/components/OfferCard";
 export default function AgentTab({ listing }: { listing: Doc<"listings"> }) {
   const messages = useQuery(api.agentMail.messagesForListing, { listingId: listing._id });
   const simulateBuyerOffer = useMutation(api.offers.simulateBuyerOffer);
-  const sendTestPriceDropSuggestion = useMutation(api.agentMail.sendTestPriceDropSuggestion);
 
   return (
     <div className="mt-4">
@@ -67,16 +66,6 @@ export default function AgentTab({ listing }: { listing: Doc<"listings"> }) {
             className="rounded-full px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-canvas hover:text-ink disabled:opacity-40"
           >
             Simulate offer
-          </button>
-          <button
-            onClick={() => {
-              const suggested = Math.max(1, Math.round(listing.price * 0.9));
-              void sendTestPriceDropSuggestion({ listingId: listing._id, suggestedPrice: suggested });
-            }}
-            disabled={listing.status !== "live"}
-            className="rounded-full px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-canvas hover:text-ink disabled:opacity-40"
-          >
-            Simulate stale listing
           </button>
         </div>
       )}

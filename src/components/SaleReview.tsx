@@ -13,7 +13,6 @@ type Props = {
   imageUrl: string;
   items: WorkspaceItem[];
   listings: Doc<"listings">[];
-  sessionId: string;
   onEdit: (id: Id<"listings">) => void;
   onBack: () => void;
   onSkip: (id: Id<"items">) => void;
@@ -21,8 +20,8 @@ type Props = {
   onBusyChange: (busy: boolean) => void;
 };
 
-export default function SaleReview({ imageUrl, items, listings, sessionId, onEdit, onBack, onSkip, onNewPhoto, onBusyChange }: Props) {
-  const connection = useQuery(api.ebayAuth.connectionStatus, { sessionId });
+export default function SaleReview({ imageUrl, items, listings, onEdit, onBack, onSkip, onNewPhoto, onBusyChange }: Props) {
+  const connection = useQuery(api.ebayAuth.connectionStatus);
   const approve = useMutation(api.listings.approve);
   const publish = useMutation(api.listingPublish.publish);
   const [busy, setBusy] = useState(false);
@@ -43,7 +42,7 @@ export default function SaleReview({ imageUrl, items, listings, sessionId, onEdi
     try {
       const failures = await publishSelection(flow.remaining,
         (listing) => approve({ listingId: listing._id, title: listing.title, description: listing.description, category: listing.category, condition: listing.condition, price: listing.price }),
-        (listing) => publish({ listingId: listing._id, sessionId }),
+        (listing) => publish({ listingId: listing._id }),
       );
       if (failures.length) setError(`Couldn't submit ${failures.length} ${failures.length === 1 ? "listing" : "listings"}. Please try again.`);
     } finally {
@@ -98,7 +97,7 @@ export default function SaleReview({ imageUrl, items, listings, sessionId, onEdi
               {canGoBack ? <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft />Change items</Button> : <span className="text-sm text-muted">{locked ? "Publishing your listings…" : "Your listings"}</span>}
               <div className="flex w-full flex-wrap items-center justify-between gap-4 sm:w-auto sm:justify-end">
                 {flow.remaining.length > 0 && <span className="text-sm tabular-nums">${total.toFixed(2)} total</span>}
-                {!connection?.connected && connection !== undefined && flow.remaining.length > 0 ? <EbayConnectButton sessionId={sessionId} /> :
+                {!connection?.connected && connection !== undefined && flow.remaining.length > 0 ? <EbayConnectButton /> :
                   <Button disabled={locked || !connection?.connected || flow.remaining.length === 0} onClick={() => void handlePublish()}>
                     {locked ? <><Loader2 className="animate-spin" />Publishing…</> : `Publish ${flow.remaining.length} ${flow.remaining.length === 1 ? "listing" : "listings"}`}
                   </Button>}

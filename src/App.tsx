@@ -8,13 +8,11 @@ import EmptyState from "@/components/EmptyState";
 import Workspace from "@/components/Workspace";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import demoRoom from "@/assets/demo-room.svg";
-import { useSessionId } from "@/lib/session";
 import { prepareUpload } from "@/lib/image";
 import { bboxOf, type Rect, type WorkspaceItem } from "@/lib/geometry";
 
 export default function App() {
-  const sessionId = useSessionId();
-  const workspace = useQuery(api.cleanouts.latestForSession, { sessionId });
+  const workspace = useQuery(api.cleanouts.latestForUser);
 
   const generateUploadUrl = useMutation(api.cleanouts.generateUploadUrl);
   const startCleanoutMutation = useMutation(api.cleanouts.start);
@@ -57,7 +55,7 @@ export default function App() {
 
       let cleanoutId: Id<"cleanouts"> | undefined;
       try {
-        cleanoutId = await startCleanoutMutation({ sessionId, title });
+        cleanoutId = await startCleanoutMutation({ title });
         // The workspace can now show its uploading state.
         setActiveId(null);
         setComposingNew(false);
@@ -103,7 +101,6 @@ export default function App() {
       attachImage,
       generateUploadUrl,
       markUploadFailed,
-      sessionId,
       startCleanoutMutation,
     ],
   );
@@ -130,7 +127,6 @@ export default function App() {
       const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
 
       await seedDemoRoom({
-        sessionId,
         storageId,
         imageWidth: prepared.width || undefined,
         imageHeight: prepared.height || undefined,
@@ -143,12 +139,12 @@ export default function App() {
     } finally {
       setBusy(false);
     }
-  }, [generateUploadUrl, seedDemoRoom, sessionId]);
+  }, [generateUploadUrl, seedDemoRoom]);
 
   const handleReset = useCallback(async () => {
     setBusy(true);
     try {
-      await resetDemoData({ sessionId });
+      await resetDemoData({});
       setActiveId(null);
       setComposingNew(false);
       setDrawing(false);
@@ -156,7 +152,7 @@ export default function App() {
     } finally {
       setBusy(false);
     }
-  }, [resetDemoData, sessionId]);
+  }, [resetDemoData]);
 
   const handleAddItem = useCallback(
     async (name: string, box: Rect) => {
@@ -224,7 +220,6 @@ export default function App() {
                 activeId={activeId}
                 hoveredId={hoveredId}
                 drawing={drawing}
-                sessionId={sessionId}
                 reviewingListingId={reviewingListingId}
                 onToggle={(itemId) => {
                   setActiveId(itemId);

@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
-export default function EbayConnectButton({ sessionId }: { sessionId: string }) {
-  const status = useQuery(api.ebayAuth.connectionStatus, { sessionId });
+export default function EbayConnectButton() {
+  const status = useQuery(api.ebayAuth.connectionStatus);
   const connect = useMutation(api.ebayAuth.connect);
   const disconnect = useMutation(api.ebayAuth.disconnect);
   const [connecting, setConnecting] = useState(false);
@@ -14,7 +14,7 @@ export default function EbayConnectButton({ sessionId }: { sessionId: string }) 
   if (status.connected) {
     return (
       <button
-        onClick={() => void disconnect({ sessionId })}
+        onClick={() => void disconnect({})}
         title="Disconnect eBay"
         className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-ink-soft ring-1 ring-line ring-inset transition-colors hover:bg-canvas"
       >
@@ -32,7 +32,7 @@ export default function EbayConnectButton({ sessionId }: { sessionId: string }) 
           setConnecting(true);
           setError(null);
           try {
-            const result = await connect({ sessionId });
+            const result = await connect({});
             if (result.authorizeUrl) {
               window.open(result.authorizeUrl, "ebay-oauth", "width=500,height=700");
             }

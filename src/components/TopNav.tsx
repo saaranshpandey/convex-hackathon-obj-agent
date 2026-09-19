@@ -1,4 +1,5 @@
 import { Plus, RotateCcw, Scan } from "lucide-react";
+import AccountMenu from "@/components/AccountMenu";
 
 type Props = {
   onHome: () => void;
@@ -50,6 +51,7 @@ export default function TopNav({
           <button onClick={onHome} aria-label="Start a new room" className="flex h-9 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-medium text-ink shadow-sm ring-1 ring-black/5 transition-colors hover:bg-line sm:px-4">
             <Plus className="size-3.5" /><span className="hidden sm:inline">New room</span>
           </button>
+          <AccountMenu />
         </nav>
       </div>
     </header>

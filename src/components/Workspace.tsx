@@ -19,7 +19,6 @@ type Props = {
   activeId: Id<"items"> | null;
   hoveredId: Id<"items"> | null;
   drawing: boolean;
-  sessionId: string;
   reviewingListingId: Id<"listings"> | null;
   onToggle: (id: Id<"items">) => void;
   onHover: (id: Id<"items"> | null) => void;
@@ -37,7 +36,7 @@ type Props = {
 };
 
 export default function Workspace({
-  cleanout, imageUrl, items, listings, activeId, hoveredId, drawing, sessionId,
+  cleanout, imageUrl, items, listings, activeId, hoveredId, drawing,
   reviewingListingId, onToggle, onHover, onRename, onRemove, onSelectAll,
   onClear, onToggleDrawing, onAddItem, onRetry, onNewPhoto, onContinue,
   onReviewListing, onCloseDrawer,
@@ -114,7 +113,7 @@ export default function Workspace({
           <ul className="space-y-4">{flow.selected.map((item) => <li key={item._id} className="flex items-center justify-between gap-4 text-sm"><span>{item.name}</span><span className="text-xs text-muted">{item.researchStatus === "failed" ? "Couldn't prepare" : flow.included.some((listing) => listing.itemId === item._id) ? "Ready" : item.researchStatus === "ready_for_review" ? "Writing listing…" : "Finding price…"}</span></li>)}</ul>
         </div>
       ) : reviewing ? (
-        <SaleReview imageUrl={imageUrl} items={items} listings={listings} sessionId={sessionId}
+        <SaleReview imageUrl={imageUrl} items={items} listings={listings}
           onEdit={onReviewListing} onBack={() => { setChoosing(true); onCloseDrawer(); }}
           onSkip={onToggle} onNewPhoto={onNewPhoto} onBusyChange={setPublishing} />
       ) : (
