@@ -8,6 +8,8 @@ import {
 import { internal } from "./_generated/api";
 import { env } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { requireOwnedCleanout, requireOwnedListing } from "./access";
 import { EbayError, getEbayMode, getEbayPublisher } from "./ebay";
 import { refreshAccessToken } from "./ebay/oauth";
 
@@ -19,10 +21,9 @@ import { refreshAccessToken } from "./ebay/oauth";
  * eBay listings.
  */
 export const publish = mutation({
-  args: { listingId: v.id("listings"), sessionId: v.string() },
+  args: { listingId: v.id("listings") },
   handler: async (ctx, args) => {
-    const listing = await ctx.db.get("listings", args.listingId);
-    if (listing === null) throw new Error("Listing not found");
+    const { listing, cleanout } = await requireOwnedListing(ctx, args.listingId);
     if (listing.status !== "approved" && listing.status !== "failed") return null;
 
     await ctx.db.patch("listings", args.listingId, {
@@ -33,7 +34,7 @@ export const publish = mutation({
 
     await ctx.scheduler.runAfter(0, internal.listingPublish.publishOne, {
       listingId: args.listingId,
-      sessionId: args.sessionId,
+      userId: cleanout.userId,
     });
 
     return null;
@@ -41,8 +42,10 @@ export const publish = mutation({
 });
 
 export const publishApproved = mutation({
-  args: { cleanoutId: v.id("cleanouts"), sessionId: v.string() },
+  args: { cleanoutId: v.id("cleanouts") },
   handler: async (ctx, args) => {
+    const cleanout = await requireOwnedCleanout(ctx, args.cleanoutId);
+
     const listings = await ctx.db
       .query("listings")
       .withIndex("by_cleanoutId", (q) => q.eq("cleanoutId", args.cleanoutId))
@@ -57,7 +60,7 @@ export const publishApproved = mutation({
       });
       await ctx.scheduler.runAfter(0, internal.listingPublish.publishOne, {
         listingId: listing._id,
-        sessionId: args.sessionId,
+        userId: cleanout.userId,
       });
     }
 
@@ -133,12 +136,12 @@ export const markPublishFailed = internalMutation({
   },
 });
 
-/** Returns null if there's no eBay connection for this session at all. */
+/** Returns null if this user has no eBay connection at all. */
 async function getValidAccessToken(
   ctx: ActionCtx,
-  sessionId: string,
+  userId: Id<"users">,
 ): Promise<{ accessToken: string; mode: string } | null> {
-  const connection = await ctx.runQuery(internal.ebayAuth.connectionForSession, { sessionId });
+  const connection = await ctx.runQuery(internal.ebayAuth.connectionForUser, { userId });
   if (connection === null) return null;
   if (connection.mode === "mock") return { accessToken: connection.accessToken, mode: "mock" };
 
@@ -163,7 +166,7 @@ async function getValidAccessToken(
   });
 
   await ctx.runMutation(internal.ebayAuth.updateAccessToken, {
-    sessionId,
+    userId,
     accessToken: refreshed.accessToken,
     accessTokenExpiresAt: refreshed.accessTokenExpiresAt,
   });
@@ -172,7 +175,7 @@ async function getValidAccessToken(
 }
 
 export const publishOne = internalAction({
-  args: { listingId: v.id("listings"), sessionId: v.string() },
+  args: { listingId: v.id("listings"), userId: v.id("users") },
   handler: async (ctx, args) => {
     try {
       const context = await ctx.runQuery(internal.listingPublish.contextForPublish, {
@@ -183,7 +186,7 @@ export const publishOne = internalAction({
         throw new Error("The source photo could not be read from storage.");
       }
 
-      const auth = await getValidAccessToken(ctx, args.sessionId);
+      const auth = await getValidAccessToken(ctx, args.userId);
       if (auth === null) throw new Error("Connect your eBay account before publishing.");
 
       // Mock mode never looks at the image — skip the crop so it stays free.

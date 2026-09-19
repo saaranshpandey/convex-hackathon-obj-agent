@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { components, internal } from "./_generated/api";
 import { registerStaticRoutes } from "@convex-dev/static-hosting";
 import { auth } from "./auth";
+import type { Id } from "./_generated/dataModel";
 import { env } from "./_generated/server";
 import { exchangeCodeForTokens } from "./ebay/oauth";
 import { verifySvixSignature } from "./agentMail/verify";
@@ -47,6 +48,13 @@ http.route({
     if (oauthError) return page(false, oauthError);
     if (!code || !state) return page(false, "Missing authorization code.");
 
+    const userId: Id<"users"> | null = await ctx.runMutation(internal.ebayAuth.consumeState, {
+      nonce: state,
+    });
+    if (userId === null) {
+      return page(false, "This connection link is invalid or has expired. Please try again.");
+    }
+
     const clientId = env.EBAY_CLIENT_ID?.trim();
     const clientSecret = env.EBAY_CLIENT_SECRET?.trim();
     const ruName = env.EBAY_RU_NAME?.trim();
@@ -64,7 +72,7 @@ http.route({
       });
 
       await ctx.runMutation(internal.ebayAuth.saveConnection, {
-        sessionId: state,
+        userId,
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         accessTokenExpiresAt: tokens.accessTokenExpiresAt,

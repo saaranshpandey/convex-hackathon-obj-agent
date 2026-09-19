@@ -258,7 +258,7 @@ export default defineSchema({
     .index("by_marketplaceOfferId", ["marketplaceOfferId"]),
 
   ebayConnections: defineTable({
-    sessionId: v.string(),
+    userId: v.id("users"),
     accessToken: v.string(),
     refreshToken: v.string(),
     accessTokenExpiresAt: v.number(),
@@ -267,7 +267,14 @@ export default defineSchema({
     mode: v.string(),
     connectedAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_sessionId", ["sessionId"]),
+  }).index("by_userId", ["userId"]),
+
+  /** One-time codes that carry a signed-in user through eBay's OAuth redirect. */
+  ebayOauthStates: defineTable({
+    nonce: v.string(),
+    userId: v.id("users"),
+    expiresAt: v.number(),
+  }).index("by_nonce", ["nonce"]),
 
   /**
    * Caches priceItem's result (Firecrawl search + pricing) by product

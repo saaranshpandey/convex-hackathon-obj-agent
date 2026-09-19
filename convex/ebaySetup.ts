@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { action, internalQuery } from "./_generated/server";
+import { internalAction, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { env } from "./_generated/server";
 
@@ -7,19 +7,21 @@ import { env } from "./_generated/server";
  * One-off operator utility: provisions the sandbox seller-account resources
  * (merchant location + fulfillment/payment/return policies) that real eBay
  * listing creation requires, using the caller's already-connected OAuth
- * token. Not part of the app's regular user-facing surface — run manually
- * once per eBay account via the Convex CLI/dashboard, not from the UI.
+ * token. Not part of the app's regular user-facing surface — run once per eBay
+ * account from the CLI, e.g.
+ * `npx convex run ebaySetup:provisionSellerAccount '{"userId":"<users id>"}'`.
+ * These are internal functions, so they can never be called from a browser.
  */
 
 const SANDBOX_API = "https://api.sandbox.ebay.com";
 const MERCHANT_LOCATION_KEY = "roomsale-default-location";
 
 export const connectionAccessToken = internalQuery({
-  args: { sessionId: v.string() },
+  args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const connection = await ctx.db
       .query("ebayConnections")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .unique();
     if (connection === null || connection.mode !== "sandbox") return null;
     return connection.accessToken;
@@ -46,15 +48,15 @@ async function ebayCall(
   return { status: response.status, json };
 }
 
-export const provisionLocationOnly = action({
-  args: { sessionId: v.string() },
+export const provisionLocationOnly = internalAction({
+  args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const accessToken: string | null = await ctx.runQuery(
       internal.ebaySetup.connectionAccessToken,
-      { sessionId: args.sessionId },
+      { userId: args.userId },
     );
     if (accessToken === null) {
-      throw new Error("No connected sandbox eBay session found for that sessionId.");
+      throw new Error("No connected sandbox eBay account found for that userId.");
     }
 
     const location = await ebayCall(
@@ -109,7 +111,7 @@ async function getAppAccessToken(): Promise<string> {
   return payload.access_token;
 }
 
-export const suggestCategory = action({
+export const suggestCategory = internalAction({
   args: { query: v.string() },
   handler: async (_ctx, args) => {
     const accessToken = await getAppAccessToken();
@@ -123,15 +125,15 @@ export const suggestCategory = action({
   },
 });
 
-export const conditionPolicies = action({
-  args: { sessionId: v.string(), categoryId: v.string() },
+export const conditionPolicies = internalAction({
+  args: { userId: v.id("users"), categoryId: v.string() },
   handler: async (ctx, args) => {
     const accessToken: string | null = await ctx.runQuery(
       internal.ebaySetup.connectionAccessToken,
-      { sessionId: args.sessionId },
+      { userId: args.userId },
     );
     if (accessToken === null) {
-      throw new Error("No connected sandbox eBay session found for that sessionId.");
+      throw new Error("No connected sandbox eBay account found for that userId.");
     }
 
     const result = await ebayCall(
@@ -143,15 +145,15 @@ export const conditionPolicies = action({
   },
 });
 
-export const retryWithCondition = action({
-  args: { sessionId: v.string(), sku: v.string(), offerId: v.string(), condition: v.string() },
+export const retryWithCondition = internalAction({
+  args: { userId: v.id("users"), sku: v.string(), offerId: v.string(), condition: v.string() },
   handler: async (ctx, args) => {
     const accessToken: string | null = await ctx.runQuery(
       internal.ebaySetup.connectionAccessToken,
-      { sessionId: args.sessionId },
+      { userId: args.userId },
     );
     if (accessToken === null) {
-      throw new Error("No connected sandbox eBay session found for that sessionId.");
+      throw new Error("No connected sandbox eBay account found for that userId.");
     }
 
     const existing = await ebayCall(accessToken, "GET", `/sell/inventory/v1/inventory_item/${args.sku}`);
@@ -172,9 +174,9 @@ export const retryWithCondition = action({
   },
 });
 
-export const retryWithAspects = action({
+export const retryWithAspects = internalAction({
   args: {
-    sessionId: v.string(),
+    userId: v.id("users"),
     sku: v.string(),
     offerId: v.string(),
     aspects: v.record(v.string(), v.array(v.string())),
@@ -182,10 +184,10 @@ export const retryWithAspects = action({
   handler: async (ctx, args) => {
     const accessToken: string | null = await ctx.runQuery(
       internal.ebaySetup.connectionAccessToken,
-      { sessionId: args.sessionId },
+      { userId: args.userId },
     );
     if (accessToken === null) {
-      throw new Error("No connected sandbox eBay session found for that sessionId.");
+      throw new Error("No connected sandbox eBay account found for that userId.");
     }
 
     const existing = await ebayCall(accessToken, "GET", `/sell/inventory/v1/inventory_item/${args.sku}`);
@@ -207,15 +209,15 @@ export const retryWithAspects = action({
   },
 });
 
-export const retryPublishOffer = action({
-  args: { sessionId: v.string(), offerId: v.string() },
+export const retryPublishOffer = internalAction({
+  args: { userId: v.id("users"), offerId: v.string() },
   handler: async (ctx, args) => {
     const accessToken: string | null = await ctx.runQuery(
       internal.ebaySetup.connectionAccessToken,
-      { sessionId: args.sessionId },
+      { userId: args.userId },
     );
     if (accessToken === null) {
-      throw new Error("No connected sandbox eBay session found for that sessionId.");
+      throw new Error("No connected sandbox eBay account found for that userId.");
     }
 
     const result = await ebayCall(
@@ -227,15 +229,15 @@ export const retryPublishOffer = action({
   },
 });
 
-export const provisionSellerAccount = action({
-  args: { sessionId: v.string() },
+export const provisionSellerAccount = internalAction({
+  args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     const accessToken: string | null = await ctx.runQuery(
       internal.ebaySetup.connectionAccessToken,
-      { sessionId: args.sessionId },
+      { userId: args.userId },
     );
     if (accessToken === null) {
-      throw new Error("No connected sandbox eBay session found for that sessionId.");
+      throw new Error("No connected sandbox eBay account found for that userId.");
     }
 
     const steps: Record<string, unknown> = {};

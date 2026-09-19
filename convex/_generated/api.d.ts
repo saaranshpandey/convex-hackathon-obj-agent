@@ -23,6 +23,7 @@ import type * as dev from "../dev.js";
 import type * as ebay_index from "../ebay/index.js";
 import type * as ebay_mock from "../ebay/mock.js";
 import type * as ebay_oauth from "../ebay/oauth.js";
+import type * as ebay_oauthState from "../ebay/oauthState.js";
 import type * as ebay_sandbox from "../ebay/sandbox.js";
 import type * as ebay_types from "../ebay/types.js";
 import type * as ebayAuth from "../ebayAuth.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   "ebay/index": typeof ebay_index;
   "ebay/mock": typeof ebay_mock;
   "ebay/oauth": typeof ebay_oauth;
+  "ebay/oauthState": typeof ebay_oauthState;
   "ebay/sandbox": typeof ebay_sandbox;
   "ebay/types": typeof ebay_types;
   ebayAuth: typeof ebayAuth;

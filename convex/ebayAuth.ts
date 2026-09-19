@@ -2,13 +2,16 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { env } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { requireUserId } from "./access";
 import { buildAuthorizeUrl } from "./ebay/oauth";
 import { getEbayMode } from "./ebay";
+import { consumeOauthState, issueOauthState } from "./ebay/oauthState";
 
 async function upsertConnection(
   ctx: MutationCtx,
   fields: {
-    sessionId: string;
+    userId: Id<"users">;
     accessToken: string;
     refreshToken: string;
     accessTokenExpiresAt: number;
@@ -18,7 +21,7 @@ async function upsertConnection(
 ) {
   const existing = await ctx.db
     .query("ebayConnections")
-    .withIndex("by_sessionId", (q) => q.eq("sessionId", fields.sessionId))
+    .withIndex("by_userId", (q) => q.eq("userId", fields.userId))
     .unique();
 
   const now = Date.now();
@@ -34,14 +37,15 @@ async function upsertConnection(
 /** Mock mode connects instantly (no OAuth). Sandbox mode returns the
  * consent URL for the client to open in a popup. */
 export const connect = mutation({
-  args: { sessionId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
     const mode = getEbayMode();
 
     if (mode === "mock") {
       const now = Date.now();
       await upsertConnection(ctx, {
-        sessionId: args.sessionId,
+        userId,
         accessToken: "mock-access-token",
         refreshToken: "mock-refresh-token",
         accessTokenExpiresAt: now + 1000 * 60 * 60 * 24 * 365,
@@ -58,20 +62,21 @@ export const connect = mutation({
       );
     }
 
-    const authorizeUrl = buildAuthorizeUrl({
-      env: "sandbox",
-      clientId,
-      ruName,
-      state: args.sessionId,
-    });
+    const state = await issueOauthState(ctx, userId);
+    const authorizeUrl = buildAuthorizeUrl({ env: "sandbox", clientId, ruName, state });
 
     return { mode: "sandbox" as const, authorizeUrl };
   },
 });
 
+export const consumeState = internalMutation({
+  args: { nonce: v.string() },
+  handler: async (ctx, args) => await consumeOauthState(ctx, args.nonce, Date.now()),
+});
+
 export const saveConnection = internalMutation({
   args: {
-    sessionId: v.string(),
+    userId: v.id("users"),
     accessToken: v.string(),
     refreshToken: v.string(),
     accessTokenExpiresAt: v.number(),
@@ -85,22 +90,24 @@ export const saveConnection = internalMutation({
 });
 
 export const connectionStatus = query({
-  args: { sessionId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
     const connection = await ctx.db
       .query("ebayConnections")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
     return { connected: connection !== null, mode: connection?.mode ?? null };
   },
 });
 
 export const disconnect = mutation({
-  args: { sessionId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
     const connection = await ctx.db
       .query("ebayConnections")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
     if (connection !== null) {
       await ctx.db.delete("ebayConnections", connection._id);
@@ -109,22 +116,22 @@ export const disconnect = mutation({
   },
 });
 
-export const connectionForSession = internalQuery({
-  args: { sessionId: v.string() },
+export const connectionForUser = internalQuery({
+  args: { userId: v.id("users") },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("ebayConnections")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .unique();
   },
 });
 
 export const updateAccessToken = internalMutation({
-  args: { sessionId: v.string(), accessToken: v.string(), accessTokenExpiresAt: v.number() },
+  args: { userId: v.id("users"), accessToken: v.string(), accessTokenExpiresAt: v.number() },
   handler: async (ctx, args) => {
     const connection = await ctx.db
       .query("ebayConnections")
-      .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .unique();
     if (connection === null) return null;
     await ctx.db.patch("ebayConnections", connection._id, {
