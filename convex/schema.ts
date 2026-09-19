@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
 
 /** Outline point in normalised image space (0..1), resolution independent. */
 export const pointValidator = v.object({ x: v.number(), y: v.number() });
@@ -142,6 +143,7 @@ export const activityType = v.union(
 );
 
 export default defineSchema({
+  ...authTables,
   cleanouts: defineTable({
     // Anonymous session id for now; becomes a real auth subject in a later phase.
     userId: v.optional(v.string()),

@@ -13,6 +13,7 @@ import type * as agentMail from "../agentMail.js";
 import type * as agentMail_client from "../agentMail/client.js";
 import type * as agentMail_parseReply from "../agentMail/parseReply.js";
 import type * as agentMail_verify from "../agentMail/verify.js";
+import type * as auth from "../auth.js";
 import type * as cleanouts from "../cleanouts.js";
 import type * as demo from "../demo.js";
 import type * as demoData from "../demoData.js";
@@ -48,6 +49,7 @@ import type * as segmentation_index from "../segmentation/index.js";
 import type * as segmentation_mock from "../segmentation/mock.js";
 import type * as segmentation_openai from "../segmentation/openai.js";
 import type * as segmentation_types from "../segmentation/types.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -61,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   "agentMail/client": typeof agentMail_client;
   "agentMail/parseReply": typeof agentMail_parseReply;
   "agentMail/verify": typeof agentMail_verify;
+  auth: typeof auth;
   cleanouts: typeof cleanouts;
   demo: typeof demo;
   demoData: typeof demoData;
@@ -96,6 +99,7 @@ declare const fullApi: ApiFromModules<{
   "segmentation/mock": typeof segmentation_mock;
   "segmentation/openai": typeof segmentation_openai;
   "segmentation/types": typeof segmentation_types;
+  users: typeof users;
 }>;
 
 /**
@@ -124,4 +128,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  staticHosting: import("@convex-dev/static-hosting/_generated/component.js").ComponentApi<"staticHosting">;
+};

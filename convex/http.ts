@@ -1,11 +1,14 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { components, internal } from "./_generated/api";
+import { registerStaticRoutes } from "@convex-dev/static-hosting";
+import { auth } from "./auth";
 import { env } from "./_generated/server";
 import { exchangeCodeForTokens } from "./ebay/oauth";
 import { verifySvixSignature } from "./agentMail/verify";
 
 const http = httpRouter();
+auth.addHttpRoutes(http);
 
 function escapeHtml(value: string): string {
   const map: Record<string, string> = {
@@ -131,5 +134,7 @@ http.route({
     return new Response("ok", { status: 200 });
   }),
 });
+
+registerStaticRoutes(http, components.staticHosting);
 
 export default http;

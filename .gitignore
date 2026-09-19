@@ -7,3 +7,5 @@ dist-ssr
 .env.local
 .vite
 keys.txt
+
+.auth-keys*.json

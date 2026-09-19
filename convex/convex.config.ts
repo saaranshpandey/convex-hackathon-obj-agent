@@ -1,7 +1,8 @@
 import { defineApp } from "convex/server";
 import { v } from "convex/values";
+import staticHosting from "@convex-dev/static-hosting/convex.config";
 
-export default defineApp({
+const app = defineApp({
   env: {
     OPENAI_API_KEY: v.optional(v.string()),
     /** Overrides the default vision model. */
@@ -50,3 +51,7 @@ export default defineApp({
     USER_NOTIFY_EMAIL: v.optional(v.string()),
   },
 });
+
+app.use(staticHosting);
+
+export default app;
