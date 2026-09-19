@@ -22,6 +22,47 @@ describe("eBay connection is per user", () => {
   });
 });
 
+describe("a connection only counts in the mode it was made in", () => {
+  it("a demo connection is not connected once eBay is in sandbox mode", async () => {
+    const t = newTest();
+    const alice = await createUser(t, "alice@example.com");
+    await alice.as.mutation(api.ebayAuth.connect, {});
+    expect((await alice.as.query(api.ebayAuth.connectionStatus, {})).connected).toBe(true);
+
+    process.env.EBAY_MODE = "sandbox";
+    try {
+      const status = await alice.as.query(api.ebayAuth.connectionStatus, {});
+      expect(status.connected).toBe(false);
+      expect(status.mode).toBeNull();
+    } finally {
+      delete process.env.EBAY_MODE;
+    }
+  });
+
+  it("publishing refuses a demo connection in sandbox mode instead of sending its fake token", async () => {
+    const t = newTest();
+    const alice = await createUser(t, "alice@example.com");
+    const cleanoutId = await alice.as.mutation(api.cleanouts.start, { title: "Alice room" });
+    const storageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(["x"])));
+    await t.run(async (ctx) => {
+      await ctx.db.patch("cleanouts", cleanoutId, { imageStorageId: storageId });
+    });
+    const listingId = await seedListing(t, cleanoutId, await seedItem(t, cleanoutId), "publishing");
+    await alice.as.mutation(api.ebayAuth.connect, {});
+
+    process.env.EBAY_MODE = "sandbox";
+    try {
+      await t.action(internal.listingPublish.publishOne, { listingId, userId: alice.userId });
+    } finally {
+      delete process.env.EBAY_MODE;
+    }
+
+    const listing = await t.run(async (ctx) => await ctx.db.get("listings", listingId));
+    expect(listing?.status).toBe("failed");
+    expect(listing?.publishError).toBe("Connect your eBay account before publishing.");
+  });
+});
+
 describe("eBay OAuth state is a one-time code", () => {
   it("works once and then is gone", async () => {
     const t = newTest();

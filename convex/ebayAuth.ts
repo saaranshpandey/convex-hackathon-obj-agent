@@ -97,7 +97,11 @@ export const connectionStatus = query({
       .query("ebayConnections")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
-    return { connected: connection !== null, mode: connection?.mode ?? null };
+
+    // A demo connection can't publish to real eBay (or the reverse), so after a
+    // mode switch the user is asked to connect again instead of failing later.
+    const usable = connection !== null && connection.mode === getEbayMode();
+    return { connected: usable, mode: usable ? connection.mode : null };
   },
 });
 

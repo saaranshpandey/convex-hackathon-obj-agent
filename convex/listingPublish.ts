@@ -146,7 +146,7 @@ async function getValidAccessToken(
   userId: Id<"users">,
 ): Promise<{ accessToken: string; mode: string } | null> {
   const connection = await ctx.runQuery(internal.ebayAuth.connectionForUser, { userId });
-  if (connection === null) return null;
+  if (connection === null || connection.mode !== getEbayMode()) return null;
   if (connection.mode === "mock") return { accessToken: connection.accessToken, mode: "mock" };
 
   // A minute of headroom avoids racing eBay's own expiry check.
