@@ -64,3 +64,23 @@ export async function seedListing(
       }),
   );
 }
+
+export async function seedOffer(
+  t: TestConvex,
+  listingId: Id<"listings">,
+  status: Doc<"offers">["status"] = "pending",
+) {
+  return await t.run(
+    async (ctx) =>
+      await ctx.db.insert("offers", {
+        listingId,
+        marketplaceOfferId: `OFFER-${Math.random().toString(36).slice(2, 10)}`,
+        amount: 30,
+        currency: "USD",
+        status,
+        source: "mock",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+  );
+}

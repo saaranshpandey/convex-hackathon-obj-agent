@@ -3,7 +3,6 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
-  mutation,
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -13,6 +12,7 @@ import { pendingDecisionKind, pendingDecisionValidator } from "./schema";
 import { getOrCreateInbox, sendMessage } from "./agentMail/client";
 import { parseReply, type ParsedAction } from "./agentMail/parseReply";
 import { isValidAmount } from "./money";
+import { requireOwnedListing } from "./access";
 
 const CONFIDENCE_THRESHOLD = 0.6;
 
@@ -21,6 +21,8 @@ type PendingDecision = Infer<typeof pendingDecisionValidator>;
 export const messagesForListing = query({
   args: { listingId: v.id("listings") },
   handler: async (ctx, args) => {
+    await requireOwnedListing(ctx, args.listingId);
+
     return await ctx.db
       .query("agentMessages")
       .withIndex("by_listingId_and_createdAt", (q) => q.eq("listingId", args.listingId))
@@ -35,7 +37,7 @@ export const messagesForListing = query({
  * offer will. Price-drop suggestions have no offer behind them, so they stay
  * here.
  */
-export const sendTestPriceDropSuggestion = mutation({
+export const sendTestPriceDropSuggestion = internalMutation({
   args: { listingId: v.id("listings"), suggestedPrice: v.number() },
   handler: async (ctx, args) => {
     const listing = await ctx.db.get("listings", args.listingId);

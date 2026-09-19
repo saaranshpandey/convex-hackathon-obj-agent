@@ -11,6 +11,7 @@ import {
   action,
   internalAction,
   internalMutation,
+  internalQuery,
   mutation,
   query,
 } from "./_generated/server";
@@ -21,6 +22,7 @@ import { listingStatus, offerSource } from "./schema";
 import { isValidAmount } from "./money";
 import { getActivityMode, getMarketplaceProvider } from "./marketplace/provider";
 import { env } from "./_generated/server";
+import { requireOwnedListing, requireOwnedOffer, requireUserId } from "./access";
 
 /**
  * Simulated marketplace events are allowed on a seeded demo room (so a judge
@@ -36,6 +38,8 @@ function assertSimulationAllowed(isDemoRoom: boolean): void {
 export const listForListing = query({
   args: { listingId: v.id("listings") },
   handler: async (ctx, args) => {
+    await requireOwnedListing(ctx, args.listingId);
+
     return await ctx.db
       .query("offers")
       .withIndex("by_listingId_and_createdAt", (q) => q.eq("listingId", args.listingId))
@@ -136,10 +140,8 @@ export const ingest = internalMutation({
 export const simulateBuyerOffer = mutation({
   args: { listingId: v.id("listings"), amount: v.number() },
   handler: async (ctx, args) => {
-    const listing = await ctx.db.get("listings", args.listingId);
-    if (listing === null) throw new Error("Listing not found");
-    const cleanout = await ctx.db.get("cleanouts", listing.cleanoutId);
-    assertSimulationAllowed(cleanout?.isDemo === true);
+    const { listing, cleanout } = await requireOwnedListing(ctx, args.listingId);
+    assertSimulationAllowed(cleanout.isDemo === true);
     if (listing.status !== "live") {
       throw new Error("Only a live listing can receive an offer");
     }
@@ -164,12 +166,8 @@ export const simulateBuyerOffer = mutation({
 export const simulateBuyerAcceptsCounter = mutation({
   args: { offerId: v.id("offers") },
   handler: async (ctx, args) => {
-    const offer = await ctx.db.get("offers", args.offerId);
-    if (offer === null) throw new Error("Offer not found");
-    const parentListing = await ctx.db.get("listings", offer.listingId);
-    const parentCleanout =
-      parentListing === null ? null : await ctx.db.get("cleanouts", parentListing.cleanoutId);
-    assertSimulationAllowed(parentCleanout?.isDemo === true);
+    const { offer, cleanout } = await requireOwnedOffer(ctx, args.offerId);
+    assertSimulationAllowed(cleanout.isDemo === true);
     if (offer.status !== "countered") {
       throw new Error("Only a countered offer can be accepted by the buyer");
     }
@@ -429,10 +427,29 @@ export const applyDecision = internalAction({
   },
 });
 
-/** Web UI entry point. Same logic as an emailed reply. */
+export const isOfferOwnedBy = internalQuery({
+  args: { offerId: v.id("offers"), userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const offer = await ctx.db.get("offers", args.offerId);
+    if (offer === null) return false;
+    const listing = await ctx.db.get("listings", offer.listingId);
+    if (listing === null) return false;
+    const cleanout = await ctx.db.get("cleanouts", listing.cleanoutId);
+    return cleanout !== null && cleanout.userId === args.userId;
+  },
+});
+
+/** Web UI entry point. Same logic as an emailed reply, after an ownership check. */
 export const decide = action({
   args: { offerId: v.id("offers"), action: offerAction, amount: v.optional(v.number()) },
   handler: async (ctx, args): Promise<{ ok: boolean; reason?: string }> => {
+    const userId = await requireUserId(ctx);
+    const owned: boolean = await ctx.runQuery(internal.offers.isOfferOwnedBy, {
+      offerId: args.offerId,
+      userId,
+    });
+    if (!owned) throw new Error("Not found");
+
     return await ctx.runAction(internal.offers.applyDecision, args);
   },
 });
