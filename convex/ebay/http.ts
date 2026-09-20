@@ -4,14 +4,21 @@ export function apiBase(env: EbayEnv): string {
   return env === "production" ? "https://api.ebay.com" : "https://api.sandbox.ebay.com";
 }
 
+/** The Identity API lives on its own host. */
+export function apizBase(env: EbayEnv): string {
+  return env === "production" ? "https://apiz.ebay.com" : "https://apiz.sandbox.ebay.com";
+}
+
 export async function ebayRequest(
   env: EbayEnv,
   accessToken: string,
   method: string,
   path: string,
   body?: unknown,
+  host: "api" | "apiz" = "api",
 ): Promise<Record<string, unknown>> {
-  const response = await fetch(`${apiBase(env)}${path}`, {
+  const base = host === "apiz" ? apizBase(env) : apiBase(env);
+  const response = await fetch(`${base}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${accessToken}`,

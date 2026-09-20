@@ -7,8 +7,18 @@
 import { EbayError, type EbayEnv, type EbayAccessToken, type EbayTokens } from "./types";
 
 // sell.account is needed to provision the merchant location and the
-// fulfillment/payment/return business policies that publishing requires.
-const SCOPES = [
+// fulfillment/payment/return business policies that publishing requires;
+// commerce.identity.readonly lets us learn the seller's eBay user ID so we can
+// honor account-deletion notices.
+const CONSENT_SCOPES = [
+  "https://api.ebay.com/oauth/api_scope/sell.inventory",
+  "https://api.ebay.com/oauth/api_scope/sell.account",
+  "https://api.ebay.com/oauth/api_scope/commerce.identity.readonly",
+].join(" ");
+
+// A refresh may only ask for scopes the original grant had; connections made
+// before the identity scope existed don't have it, and it is only needed once.
+const REFRESH_SCOPES = [
   "https://api.ebay.com/oauth/api_scope/sell.inventory",
   "https://api.ebay.com/oauth/api_scope/sell.account",
 ].join(" ");
@@ -31,7 +41,7 @@ export function buildAuthorizeUrl(input: {
   url.searchParams.set("client_id", input.clientId);
   url.searchParams.set("redirect_uri", input.ruName);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", SCOPES);
+  url.searchParams.set("scope", CONSENT_SCOPES);
   url.searchParams.set("state", input.state);
   return url.toString();
 }
@@ -132,7 +142,7 @@ export async function refreshAccessToken(input: {
     new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: input.refreshToken,
-      scope: SCOPES,
+      scope: REFRESH_SCOPES,
     }),
   );
 

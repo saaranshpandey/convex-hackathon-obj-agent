@@ -7,6 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { env } from "./_generated/server";
 import { exchangeCodeForTokens } from "./ebay/oauth";
 import { getEbayEnv } from "./ebay";
+import { fetchEbayUserId } from "./ebay/identity";
 import { verifySvixSignature } from "./agentMail/verify";
 import { challengeResponse } from "./ebay/notificationSignature";
 
@@ -76,6 +77,7 @@ http.route({
         ruName,
         code,
       });
+      const ebayUserId = await fetchEbayUserId(ebayEnv, tokens.accessToken);
 
       await ctx.runMutation(internal.ebayAuth.saveConnection, {
         userId: pending.userId,
@@ -85,6 +87,7 @@ http.route({
         refreshTokenExpiresAt: tokens.refreshTokenExpiresAt ?? undefined,
         mode: ebayEnv,
         shipFromPostalCode: pending.postalCode ?? undefined,
+        ebayUserId,
       });
 
       return page(true, "");

@@ -20,6 +20,7 @@ async function upsertConnection(
     refreshTokenExpiresAt?: number;
     mode: string;
     shipFromPostalCode?: string;
+    ebayUserId?: string;
   },
 ) {
   const existing = await ctx.db
@@ -91,6 +92,7 @@ export const saveConnection = internalMutation({
     refreshTokenExpiresAt: v.optional(v.number()),
     mode: v.string(),
     shipFromPostalCode: v.optional(v.string()),
+    ebayUserId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await upsertConnection(ctx, args);
@@ -123,12 +125,14 @@ export const connectionStatus = query({
 
     const configuredMode = getEbayMode();
     // A demo connection can't publish to real eBay (or the reverse), and a real
-    // one needs the seller's ZIP, so after a mode switch or for an older
+    // one needs the seller's ZIP (and, in production, their eBay user ID, which
+    // deletion notices are matched on), so after a mode switch or for an older
     // connection the user is asked to connect again instead of failing later.
     const usable =
       connection !== null &&
       connection.mode === configuredMode &&
-      (configuredMode === "mock" || connection.shipFromPostalCode !== undefined);
+      (configuredMode === "mock" || connection.shipFromPostalCode !== undefined) &&
+      (configuredMode !== "production" || connection.ebayUserId !== undefined);
 
     return {
       connected: usable,

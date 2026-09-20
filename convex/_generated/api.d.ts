@@ -24,6 +24,7 @@ import type * as detection from "../detection.js";
 import type * as dev from "../dev.js";
 import type * as ebay_categoryRules from "../ebay/categoryRules.js";
 import type * as ebay_http from "../ebay/http.js";
+import type * as ebay_identity from "../ebay/identity.js";
 import type * as ebay_index from "../ebay/index.js";
 import type * as ebay_itemDetails from "../ebay/itemDetails.js";
 import type * as ebay_mock from "../ebay/mock.js";
@@ -85,6 +86,7 @@ declare const fullApi: ApiFromModules<{
   dev: typeof dev;
   "ebay/categoryRules": typeof ebay_categoryRules;
   "ebay/http": typeof ebay_http;
+  "ebay/identity": typeof ebay_identity;
   "ebay/index": typeof ebay_index;
   "ebay/itemDetails": typeof ebay_itemDetails;
   "ebay/mock": typeof ebay_mock;

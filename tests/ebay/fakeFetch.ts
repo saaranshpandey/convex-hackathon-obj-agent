@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-export type FakeCall = { method: string; path: string; query: string; body: unknown };
+export type FakeCall = { method: string; host: string; path: string; query: string; body: unknown };
 export type FakeReply = { status: number; json?: unknown };
 export type FakeHandlers = Record<string, (call: FakeCall) => FakeReply>;
 
@@ -28,6 +28,7 @@ export function fakeEbay(handlers: FakeHandlers): FakeCall[] {
       const method = init?.method ?? "GET";
       const call: FakeCall = {
         method,
+        host: url.host,
         path: url.pathname,
         query: url.search,
         body: readBody(init?.body),

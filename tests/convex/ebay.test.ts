@@ -1,6 +1,7 @@
 // @vitest-environment edge-runtime
 import { describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { issueOauthState } from "../../convex/ebay/oauthState";
 import { createUser, newTest, seedItem, seedListing } from "./helpers";
 
@@ -292,6 +293,55 @@ describe("production mode", () => {
       delete process.env.EBAY_MODE;
       delete process.env.EBAY_CLIENT_ID;
       delete process.env.EBAY_RU_NAME;
+    }
+  });
+});
+
+describe("production connections need the seller's eBay ID", () => {
+  const connect = async (t: ReturnType<typeof newTest>, userId: Id<"users">, extra: Record<string, string>) =>
+    await t.mutation(internal.ebayAuth.saveConnection, {
+      userId,
+      accessToken: "token",
+      refreshToken: "refresh",
+      accessTokenExpiresAt: Date.now() + 3_600_000,
+      mode: "production",
+      shipFromPostalCode: "94105",
+      ...extra,
+    });
+
+  it("counts as connected only with a ZIP and an eBay user ID", async () => {
+    const t = newTest();
+    const alice = await createUser(t, "alice@example.com");
+    const bob = await createUser(t, "bob@example.com");
+    await connect(t, alice.userId, { ebayUserId: "ebay-alice" });
+    await connect(t, bob.userId, {});
+
+    process.env.EBAY_MODE = "production";
+    try {
+      expect((await alice.as.query(api.ebayAuth.connectionStatus, {})).connected).toBe(true);
+      expect((await bob.as.query(api.ebayAuth.connectionStatus, {})).connected).toBe(false);
+    } finally {
+      delete process.env.EBAY_MODE;
+    }
+  });
+
+  it("keeps working for older sandbox connections that have no eBay ID", async () => {
+    const t = newTest();
+    const alice = await createUser(t, "alice@example.com");
+    await t.mutation(internal.ebayAuth.saveConnection, {
+      userId: alice.userId,
+      accessToken: "token",
+      refreshToken: "refresh",
+      accessTokenExpiresAt: Date.now() + 3_600_000,
+      mode: "sandbox",
+      shipFromPostalCode: "94105",
+    });
+
+    process.env.EBAY_MODE = "sandbox";
+    try {
+      expect((await alice.as.query(api.ebayAuth.connectionStatus, {})).connected).toBe(true);
+    } finally {
+      delete process.env.EBAY_MODE;
     }
   });
 });
