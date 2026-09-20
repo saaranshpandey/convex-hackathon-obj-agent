@@ -132,6 +132,24 @@ describe("eBay account-deletion notifications", () => {
     expect(await remaining(t)).toEqual([notificationUserId]);
   });
 
+  it("logs why it refused, since eBay only sees the status", async () => {
+    const t = newTest();
+    fakeEbay(keyHandler(otherPublicKeyPem));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    try {
+      await withEbayEnv(() =>
+        t.action(internal.ebayNotifications.handle, {
+          body: notificationBody,
+          signatureHeader: header(notificationSignatureDer),
+        }),
+      );
+      expect(log).toHaveBeenCalledWith(expect.stringContaining("signature did not verify"));
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("refuses a missing or malformed signature header without calling eBay", async () => {
     const t = newTest();
     await connectionFor(t, "alice@example.com", notificationUserId);

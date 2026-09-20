@@ -37,6 +37,12 @@ export const cachePublicKey = internalMutation({
   },
 });
 
+/** eBay only sees the status, so a refusal is otherwise silent: log why. */
+function refuse(status: number, reason: string): { status: number } {
+  console.log(`eBay deletion notice refused (${status}): ${reason}`);
+  return { status };
+}
+
 /**
  * Handles one eBay marketplace account-deletion notification: nothing is
  * deleted unless eBay's signature on the exact body verifies.
@@ -48,11 +54,11 @@ export const handle = internalAction({
     if (ebayEnv === null) return { status: 200 };
 
     const decoded = decodeSignatureHeader(args.signatureHeader);
-    if (decoded === null) return { status: 412 };
+    if (decoded === null) return refuse(412, "missing or unreadable X-EBAY-SIGNATURE header");
 
     const clientId = env.EBAY_CLIENT_ID?.trim();
     const clientSecret = env.EBAY_CLIENT_SECRET?.trim();
-    if (!clientId || !clientSecret) return { status: 500 };
+    if (!clientId || !clientSecret) return refuse(500, "EBAY_CLIENT_ID / EBAY_CLIENT_SECRET are not set");
 
     const now = Date.now();
     let pem: string | null = await ctx.runQuery(internal.ebayNotifications.cachedPublicKey, {
@@ -69,7 +75,7 @@ export const handle = internalAction({
           "GET",
           `/commerce/notification/v1/public_key/${encodeURIComponent(decoded.kid)}`,
         );
-        if (typeof response.key !== "string") return { status: 412 };
+        if (typeof response.key !== "string") return refuse(412, "eBay's key response had no key");
         pem = response.key;
         await ctx.runMutation(internal.ebayNotifications.cachePublicKey, {
           kid: decoded.kid,
@@ -77,7 +83,9 @@ export const handle = internalAction({
           fetchedAt: now,
         });
       } catch (error) {
-        return { status: error instanceof EbayError && error.status === 404 ? 412 : 500 };
+        const notFound = error instanceof EbayError && error.status === 404;
+        const detail = error instanceof Error ? error.message : "unknown error";
+        return refuse(notFound ? 412 : 500, `couldn't get eBay's public key for ${decoded.kid} from ${ebayEnv}: ${detail}`);
       }
     }
 
@@ -86,7 +94,7 @@ export const handle = internalAction({
       body: args.body,
       signature: decoded.signature,
     });
-    if (!valid) return { status: 412 };
+    if (!valid) return refuse(412, "signature did not verify against eBay's public key");
 
     const ebayUserId = readDeletedUserId(args.body);
     if (ebayUserId !== null) {
