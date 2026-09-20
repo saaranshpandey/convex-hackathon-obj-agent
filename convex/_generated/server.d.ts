@@ -37,6 +37,7 @@ type Env = {
   readonly EBAY_ACTIVITY_MODE: string | undefined;
   readonly EBAY_CLIENT_ID: string | undefined;
   readonly EBAY_CLIENT_SECRET: string | undefined;
+  readonly EBAY_DELETION_VERIFICATION_TOKEN: string | undefined;
   readonly EBAY_MODE: string | undefined;
   readonly EBAY_RU_NAME: string | undefined;
   readonly FAL_KEY: string | undefined;

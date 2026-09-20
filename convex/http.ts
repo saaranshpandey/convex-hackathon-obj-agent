@@ -7,6 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import { env } from "./_generated/server";
 import { exchangeCodeForTokens } from "./ebay/oauth";
 import { verifySvixSignature } from "./agentMail/verify";
+import { challengeResponse } from "./ebay/notificationSignature";
 
 const http = httpRouter();
 auth.addHttpRoutes(http);
@@ -153,6 +154,37 @@ http.route({
     });
 
     return new Response("ok", { status: 200 });
+  }),
+});
+
+http.route({
+  path: "/ebay/account-deletion",
+  method: "GET",
+  handler: httpAction(async (_ctx, req) => {
+    const code = new URL(req.url).searchParams.get("challenge_code");
+    const token = env.EBAY_DELETION_VERIFICATION_TOKEN?.trim();
+    if (!code || !token) {
+      return new Response("Missing challenge code or verification token", { status: 400 });
+    }
+
+    const endpoint = `${env.CONVEX_SITE_URL}/ebay/account-deletion`;
+    return new Response(
+      JSON.stringify({ challengeResponse: await challengeResponse(code, token, endpoint) }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }),
+});
+
+http.route({
+  path: "/ebay/account-deletion",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    const body = await req.text();
+    const result: { status: number } = await ctx.runAction(internal.ebayNotifications.handle, {
+      body,
+      signatureHeader: req.headers.get("x-ebay-signature") ?? undefined,
+    });
+    return new Response(null, { status: result.status });
   }),
 });
 
