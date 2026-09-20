@@ -345,3 +345,51 @@ describe("production connections need the seller's eBay ID", () => {
     }
   });
 });
+
+describe("demo rooms never reach real eBay", () => {
+  it("publishes a demo room's listing through the simulated publisher in production mode", async () => {
+    const t = newTest();
+    const alice = await createUser(t, "alice@example.com");
+    const cleanoutId = await alice.as.mutation(api.cleanouts.start, { title: "Demo room" });
+    const storageId = await t.run(async (ctx) => await ctx.storage.store(new Blob(["x"])));
+    await t.run(async (ctx) => {
+      await ctx.db.patch("cleanouts", cleanoutId, { imageStorageId: storageId, isDemo: true });
+      const now = Date.now();
+      await ctx.db.insert("ebayConnections", {
+        userId: alice.userId,
+        accessToken: "token",
+        refreshToken: "refresh",
+        accessTokenExpiresAt: now + 3_600_000,
+        mode: "production",
+        connectedAt: now,
+        updatedAt: now,
+        shipFromPostalCode: "94105",
+        ebayUserId: "ebay-alice",
+      });
+    });
+    const listingId = await seedListing(t, cleanoutId, await seedItem(t, cleanoutId), "publishing");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => {
+        throw new Error("a demo room must not touch the network");
+      }),
+    );
+    process.env.EBAY_MODE = "production";
+    try {
+      await t.action(internal.listingPublish.publishOne, { listingId, userId: alice.userId });
+      // Publishing schedules the live-listing email; let it finish so it cannot
+      // run after the test. (Real timers: the simulated publisher sleeps 600 ms.)
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await t.finishInProgressScheduledFunctions();
+    } finally {
+      delete process.env.EBAY_MODE;
+      vi.unstubAllGlobals();
+    }
+
+    const listing = await t.run(async (ctx) => await ctx.db.get("listings", listingId));
+    expect(listing?.status).toBe("live");
+    expect(listing?.publishMode).toBe("mock");
+    expect(listing?.ebayListingUrl).toContain("mock");
+  });
+});

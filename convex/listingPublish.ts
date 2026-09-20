@@ -89,6 +89,7 @@ export const contextForPublish = internalQuery({
     return {
       listing,
       imageUrl,
+      isDemo: cleanout?.isDemo === true,
       identification: item.identification ?? {
         genericName: item.name,
         brand: null,
@@ -292,23 +293,26 @@ export const publishOne = internalAction({
         price: context.listing.price,
       };
 
-      const liveEnv = getEbayEnv();
+      const ebayEnv = getEbayEnv();
+      // A demo room's items are not real, so in production they are simulated
+      // exactly like demo mode: nothing is sent to eBay and nothing is billed.
+      const liveEnv = ebayEnv === "production" && context.isDemo ? null : ebayEnv;
 
-      // Demo mode never looks at the image or eBay, so it stays free. The mock
-      // publisher ignores the input's environment.
+      // Simulated listings never look at the image or eBay, so they stay free.
+      // The mock publisher ignores the input's environment.
       const input: PublishInput =
         liveEnv === null
           ? { accessToken: auth.accessToken, env: "sandbox", listing: { ...base, imageUrl } }
           : await buildLiveInput(ctx, liveEnv, args.userId, auth, context, imageUrl, base);
 
-      const result = await getEbayPublisher().publish(input);
+      const result = await getEbayPublisher(liveEnv === null).publish(input);
 
       await ctx.runMutation(internal.listingPublish.markPublished, {
         listingId: args.listingId,
         ebayListingId: result.ebayListingId,
         ebayOfferId: result.ebayOfferId,
         ebayListingUrl: result.ebayListingUrl,
-        mode: auth.mode,
+        mode: liveEnv === null ? "mock" : auth.mode,
       });
     } catch (error) {
       await ctx.runMutation(internal.listingPublish.markPublishFailed, {

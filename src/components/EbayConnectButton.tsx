@@ -26,7 +26,7 @@ export default function EbayConnectButton() {
     );
   }
 
-  const needsZip = status.configuredMode === "sandbox";
+  const needsZip = status.configuredMode !== "mock";
   const zipValue = zip ?? status.shipFromPostalCode ?? "";
   const canConnect = !connecting && (!needsZip || isValidPostalCode(zipValue));
 
