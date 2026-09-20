@@ -164,6 +164,18 @@ export const connectionForUser = internalQuery({
   },
 });
 
+export const deleteByEbayUserId = internalMutation({
+  args: { ebayUserId: v.string() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("ebayConnections")
+      .withIndex("by_ebayUserId", (q) => q.eq("ebayUserId", args.ebayUserId))
+      .take(50);
+    for (const row of rows) await ctx.db.delete("ebayConnections", row._id);
+    return rows.length;
+  },
+});
+
 export const updateAccessToken = internalMutation({
   args: { userId: v.id("users"), accessToken: v.string(), accessTokenExpiresAt: v.number() },
   handler: async (ctx, args) => {

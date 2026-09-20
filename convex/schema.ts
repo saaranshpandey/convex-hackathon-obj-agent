@@ -278,7 +278,11 @@ export default defineSchema({
     shipFromPostalCode: v.optional(v.string()),
     /** The seller's own location and policy IDs, once they have been created. */
     sellerSetup: v.optional(sellerSetupValidator),
-  }).index("by_userId", ["userId"]),
+    /** eBay's own immutable ID for this seller; lets us honor account-deletion notices. */
+    ebayUserId: v.optional(v.string()),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_ebayUserId", ["ebayUserId"]),
 
   /** One-time codes that carry a signed-in user through eBay's OAuth redirect. */
   ebayOauthStates: defineTable({
@@ -288,6 +292,13 @@ export default defineSchema({
     /** The ZIP the seller entered before being sent to eBay. */
     postalCode: v.optional(v.string()),
   }).index("by_nonce", ["nonce"]),
+
+  /** eBay's notification-signing public keys, cached for an hour. */
+  ebayPublicKeys: defineTable({
+    kid: v.string(),
+    pem: v.string(),
+    fetchedAt: v.number(),
+  }).index("by_kid", ["kid"]),
 
   /**
    * Caches priceItem's result (Firecrawl search + pricing) by product
