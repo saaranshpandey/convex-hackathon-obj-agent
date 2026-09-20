@@ -9,6 +9,21 @@
 import { ebayRequest } from "./http";
 import { EbayError, type EbayEnv, type EbayPublisher } from "./types";
 
+const RETRY_DELAYS_MS = [1_000, 3_000];
+
+/** eBay's own server errors are theirs, not ours, and replacing an item is safe to repeat. */
+async function retryServerErrors<T>(run: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      const serverError = error instanceof EbayError && error.status !== undefined && error.status >= 500;
+      if (!serverError || attempt >= RETRY_DELAYS_MS.length) throw error;
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+    }
+  }
+}
+
 export function createSandboxPublisher(env: EbayEnv): EbayPublisher {
   return {
     name: env,
@@ -37,8 +52,8 @@ export function createSandboxPublisher(env: EbayEnv): EbayPublisher {
 
       const sku = input.listing.sku;
 
-      const putInventoryItem = (condition: string) =>
-        ebayRequest(env, input.accessToken, "PUT", `/sell/inventory/v1/inventory_item/${sku}`, {
+      const putInventoryItem = async (condition: string) => {
+        const body = {
           condition,
           product: {
             title: input.listing.title,
@@ -55,7 +70,18 @@ export function createSandboxPublisher(env: EbayEnv): EbayPublisher {
           availability: {
             shipToLocationAvailability: { quantity: 1 },
           },
-        });
+        };
+
+        try {
+          await retryServerErrors(() =>
+            ebayRequest(env, input.accessToken, "PUT", `/sell/inventory/v1/inventory_item/${sku}`, body),
+          );
+        } catch (error) {
+          // eBay's reply says little about which field it choked on, so keep what we sent.
+          console.log(`eBay inventory item save failed for ${sku} on ${env}: ${JSON.stringify(body)}`);
+          throw error;
+        }
+      };
 
       await putInventoryItem(ebayCondition);
 
