@@ -813,14 +813,16 @@ http.route({
 });
 ```
 
-- [ ] **Step 3: Typecheck and push to dev**
+- [ ] **Step 3: Push to dev, then typecheck**
+
+Push first: the typed `env` is generated from `convex.config.ts`, so `tsc` only knows about `EBAY_DELETION_VERIFICATION_TOKEN` after the push regenerates `convex/_generated/server.d.ts`.
 
 ```bash
-npx tsc --noEmit -p convex/tsconfig.json
 npx convex dev --once
+npx tsc --noEmit -p convex/tsconfig.json
 ```
 
-Expected: typecheck prints nothing; push succeeds.
+Expected: push succeeds; typecheck prints nothing.
 
 - [ ] **Step 4: Set a throwaway token on dev and check the real endpoint**
 
@@ -843,7 +845,7 @@ Expected: the two JSON lines are identical; then `400`, `412`, `412`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add convex/http.ts convex/convex.config.ts convex/_generated/api.d.ts
+git add convex/http.ts convex/convex.config.ts convex/_generated/server.d.ts
 git commit -m "feat: serve eBay's account-deletion handshake and notifications" -m "Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```
 
