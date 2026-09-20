@@ -7,8 +7,7 @@ export class EbayError extends Error {
   }
 }
 
-/** This app only ever targets sandbox — "production" exists so the code
- * isn't hardcoded to one host, not because this build supports going live. */
+/** "sandbox" for development and testing, "production" for real sellers. */
 export type EbayEnv = "sandbox" | "production";
 
 export type EbayTokens = {

@@ -37,7 +37,7 @@ async function upsertConnection(
   }
 }
 
-/** Mock mode connects instantly (no OAuth). Sandbox mode returns the
+/** Mock mode connects instantly (no OAuth). Sandbox and production return the
  * consent URL for the client to open in a popup. */
 export const connect = mutation({
   args: { postalCode: v.optional(v.string()) },
@@ -66,14 +66,14 @@ export const connect = mutation({
     const ruName = env.EBAY_RU_NAME?.trim();
     if (!clientId || !ruName) {
       throw new Error(
-        "eBay sandbox isn't configured yet — EBAY_CLIENT_ID and EBAY_RU_NAME must be set in the Convex environment.",
+        `eBay ${mode} isn't configured yet — EBAY_CLIENT_ID and EBAY_RU_NAME must be set in the Convex environment.`,
       );
     }
 
     const state = await issueOauthState(ctx, userId, postalCode);
-    const authorizeUrl = buildAuthorizeUrl({ env: "sandbox", clientId, ruName, state });
+    const authorizeUrl = buildAuthorizeUrl({ env: mode, clientId, ruName, state });
 
-    return { mode: "sandbox" as const, authorizeUrl };
+    return { mode, authorizeUrl };
   },
 });
 

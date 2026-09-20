@@ -11,7 +11,7 @@ import type { ActionCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireOwnedCleanout, requireOwnedListing } from "./access";
 import type { IdentificationResult } from "./identify";
-import { EbayError, getEbayMode, getEbayPublisher, type PublishInput } from "./ebay";
+import { EbayError, getEbayEnv, getEbayMode, getEbayPublisher, type EbayEnv, type PublishInput } from "./ebay";
 import { getAppAccessToken, refreshAccessToken } from "./ebay/oauth";
 import { locationKeyFor } from "./ebay/postalCode";
 import { resolveListingSpec } from "./ebay/prepare";
@@ -158,7 +158,8 @@ async function getValidAccessToken(
 ): Promise<{ accessToken: string; mode: string; connection: Doc<"ebayConnections"> } | null> {
   const connection = await ctx.runQuery(internal.ebayAuth.connectionForUser, { userId });
   if (connection === null || connection.mode !== getEbayMode()) return null;
-  if (connection.mode === "mock") {
+  const ebayEnv = getEbayEnv();
+  if (ebayEnv === null) {
     return { accessToken: connection.accessToken, mode: "mock", connection };
   }
 
@@ -176,7 +177,7 @@ async function getValidAccessToken(
   }
 
   const refreshed = await refreshAccessToken({
-    env: "sandbox",
+    env: ebayEnv,
     clientId,
     clientSecret,
     refreshToken: connection.refreshToken,
@@ -204,8 +205,9 @@ type PublishBase = { sku: string; title: string; description: string; price: num
  * seller's own location and policies, and the item's category, condition and
  * required details.
  */
-async function buildSandboxInput(
+async function buildLiveInput(
   ctx: ActionCtx,
+  ebayEnv: EbayEnv,
   userId: Id<"users">,
   auth: { accessToken: string; connection: Doc<"ebayConnections"> },
   context: PublishContext,
@@ -221,7 +223,7 @@ async function buildSandboxInput(
 
   let setup = auth.connection.sellerSetup;
   if (setup === undefined || setup.locationKey !== locationKeyFor(postalCode)) {
-    setup = await ensureSellerSetup({ env: "sandbox", accessToken: auth.accessToken, postalCode });
+    setup = await ensureSellerSetup({ env: ebayEnv, accessToken: auth.accessToken, postalCode });
     await ctx.runMutation(internal.ebayAuth.saveSellerSetup, { userId, sellerSetup: setup });
   }
 
@@ -233,9 +235,9 @@ async function buildSandboxInput(
   const openaiApiKey = env.OPENAI_API_KEY?.trim();
   if (!openaiApiKey) throw new Error("OPENAI_API_KEY is not set in the Convex environment.");
 
-  const appToken = await getAppAccessToken({ env: "sandbox", clientId, clientSecret });
+  const appToken = await getAppAccessToken({ env: ebayEnv, clientId, clientSecret });
   const spec = await resolveListingSpec({
-    env: "sandbox",
+    env: ebayEnv,
     appToken,
     openaiApiKey,
     model: env.OPENAI_VISION_MODEL?.trim() || undefined,
@@ -252,7 +254,7 @@ async function buildSandboxInput(
 
   return {
     accessToken: auth.accessToken,
-    env: "sandbox",
+    env: ebayEnv,
     categoryId: spec.categoryId,
     merchantLocationKey: setup.locationKey,
     fulfillmentPolicyId: setup.fulfillmentPolicyId,
@@ -290,11 +292,14 @@ export const publishOne = internalAction({
         price: context.listing.price,
       };
 
-      // Demo mode never looks at the image or eBay, so it stays free.
+      const liveEnv = getEbayEnv();
+
+      // Demo mode never looks at the image or eBay, so it stays free. The mock
+      // publisher ignores the input's environment.
       const input: PublishInput =
-        auth.mode === "mock"
+        liveEnv === null
           ? { accessToken: auth.accessToken, env: "sandbox", listing: { ...base, imageUrl } }
-          : await buildSandboxInput(ctx, args.userId, auth, context, imageUrl, base);
+          : await buildLiveInput(ctx, liveEnv, args.userId, auth, context, imageUrl, base);
 
       const result = await getEbayPublisher().publish(input);
 

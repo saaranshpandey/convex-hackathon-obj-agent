@@ -273,3 +273,25 @@ describe("publishing in sandbox mode needs the seller's ZIP", () => {
     );
   });
 });
+
+describe("production mode", () => {
+  it("connect in production mode sends the seller to eBay's production consent page", async () => {
+    const t = newTest();
+    const alice = await createUser(t, "alice@example.com");
+
+    process.env.EBAY_MODE = "production";
+    process.env.EBAY_CLIENT_ID = "client-id";
+    process.env.EBAY_RU_NAME = "ru-name";
+    try {
+      const result = await alice.as.mutation(api.ebayAuth.connect, { postalCode: "94105" });
+
+      expect(result.mode).toBe("production");
+      expect(result.authorizeUrl).toContain("https://auth.ebay.com/oauth2/authorize");
+      expect(result.authorizeUrl).not.toContain("sandbox");
+    } finally {
+      delete process.env.EBAY_MODE;
+      delete process.env.EBAY_CLIENT_ID;
+      delete process.env.EBAY_RU_NAME;
+    }
+  });
+});

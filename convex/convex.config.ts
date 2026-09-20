@@ -22,7 +22,7 @@ const app = defineApp({
     /** Enables Phase 4 resale research (Firecrawl web search). */
     FIRECRAWL_API_KEY: v.optional(v.string()),
 
-    /** "mock" | "sandbox". Defaults to "mock" if unset — the demo always works. */
+    /** "mock" | "sandbox" | "production". Defaults to "mock" if unset — the demo always works. */
     EBAY_MODE: v.optional(v.string()),
     /** "mock" | "ebay". Source of offer activity; independent of EBAY_MODE. */
     EBAY_ACTIVITY_MODE: v.optional(v.string()),

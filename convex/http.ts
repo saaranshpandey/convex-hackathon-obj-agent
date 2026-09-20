@@ -6,6 +6,7 @@ import { auth } from "./auth";
 import type { Id } from "./_generated/dataModel";
 import { env } from "./_generated/server";
 import { exchangeCodeForTokens } from "./ebay/oauth";
+import { getEbayEnv } from "./ebay";
 import { verifySvixSignature } from "./agentMail/verify";
 import { challengeResponse } from "./ebay/notificationSignature";
 
@@ -55,6 +56,11 @@ http.route({
       return page(false, "This connection link is invalid or has expired. Please try again.");
     }
 
+    const ebayEnv = getEbayEnv();
+    if (ebayEnv === null) {
+      return page(false, "eBay isn't set up for real connections on this server.");
+    }
+
     const clientId = env.EBAY_CLIENT_ID?.trim();
     const clientSecret = env.EBAY_CLIENT_SECRET?.trim();
     const ruName = env.EBAY_RU_NAME?.trim();
@@ -64,7 +70,7 @@ http.route({
 
     try {
       const tokens = await exchangeCodeForTokens({
-        env: "sandbox",
+        env: ebayEnv,
         clientId,
         clientSecret,
         ruName,
@@ -77,7 +83,7 @@ http.route({
         refreshToken: tokens.refreshToken,
         accessTokenExpiresAt: tokens.accessTokenExpiresAt,
         refreshTokenExpiresAt: tokens.refreshTokenExpiresAt ?? undefined,
-        mode: "sandbox",
+        mode: ebayEnv,
         shipFromPostalCode: pending.postalCode ?? undefined,
       });
 

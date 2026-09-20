@@ -238,7 +238,7 @@ export default defineSchema({
     ebayOfferId: v.optional(v.string()),
     ebayListingUrl: v.optional(v.string()),
     publishError: v.optional(v.string()),
-    /** "mock" | "sandbox" — which mode actually produced this result. */
+    /** "mock" | "sandbox" | "production" — which mode actually produced this result. */
     publishMode: v.optional(v.string()),
 
     // Phase 7: the one open question the owner needs to answer, if any.
@@ -270,7 +270,7 @@ export default defineSchema({
     refreshToken: v.string(),
     accessTokenExpiresAt: v.number(),
     refreshTokenExpiresAt: v.optional(v.number()),
-    /** "mock" | "sandbox". */
+    /** "mock" | "sandbox" | "production". */
     mode: v.string(),
     connectedAt: v.number(),
     updatedAt: v.number(),
