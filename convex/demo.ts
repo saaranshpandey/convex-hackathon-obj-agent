@@ -140,6 +140,7 @@ export const finishScan = internalMutation({
  * `research.startResearch`, so the user's interaction is identical.
  */
 export const simulateResearch = internalMutation({
+  returns: v.null(),
   args: { cleanoutId: v.id("cleanouts"), itemIds: v.array(v.id("items")) },
   handler: async (ctx, args) => {
     for (const itemId of args.itemIds) {
@@ -158,6 +159,7 @@ export const simulateResearch = internalMutation({
 });
 
 export const applyIdentification = internalMutation({
+  returns: v.null(),
   args: { cleanoutId: v.id("cleanouts"), itemIds: v.array(v.id("items")) },
   handler: async (ctx, args) => {
     for (const itemId of args.itemIds) {
@@ -182,6 +184,7 @@ export const applyIdentification = internalMutation({
 });
 
 export const applyPricing = internalMutation({
+  returns: v.null(),
   args: { cleanoutId: v.id("cleanouts"), itemIds: v.array(v.id("items")) },
   handler: async (ctx, args) => {
     for (const itemId of args.itemIds) {
@@ -210,6 +213,7 @@ export const applyPricing = internalMutation({
 });
 
 export const draftListings = internalMutation({
+  returns: v.null(),
   args: { cleanoutId: v.id("cleanouts"), itemIds: v.array(v.id("items")) },
   handler: async (ctx, args) => {
     const now = Date.now();

@@ -19,8 +19,6 @@ import { identifyItem, ResearchError, type IdentificationResult } from "./identi
 import { priceItem, subjectFor, type PricingResult } from "./priceResearch";
 import { generateListing } from "./generateListing";
 
-/** How many items may be researched at once. Same bound as mask refinement. */
-const RESEARCH_CONCURRENCY = 4;
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [400, 1200];
 
@@ -60,6 +58,7 @@ async function withRetry<T>(operation: () => Promise<T>): Promise<T> {
  */
 export const startResearch = mutation({
   args: { cleanoutId: v.id("cleanouts") },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const cleanout = await requireOwnedCleanout(ctx, args.cleanoutId);
 
@@ -69,6 +68,8 @@ export const startResearch = mutation({
       .take(50);
     const selected = items.filter((item) => item.selected);
     if (selected.length === 0) throw new Error("Select at least one item first");
+    // Repeated clicks or another tab must not create overlapping workers.
+    if (items.some((item) => ["queued", "identifying", "researching"].includes(item.researchStatus ?? ""))) return null;
 
     for (const item of selected) {
       await ctx.db.patch("items", item._id, {
@@ -283,6 +284,7 @@ export const markResearchFailed = internalMutation({
  * batch keeps going, mirroring masks.ts's refineCleanout.
  */
 export const researchCleanout = internalAction({
+  returns: v.null(),
   args: { cleanoutId: v.id("cleanouts"), itemIds: v.array(v.id("items")) },
   handler: async (ctx, args) => {
     const context: {
@@ -427,17 +429,15 @@ export const researchCleanout = internalAction({
       }
     };
 
+    // Keep provider load bounded while researching independent items in parallel.
     const queue = [...context.items];
-    const workers = Array.from(
-      { length: Math.min(RESEARCH_CONCURRENCY, queue.length) },
-      async () => {
-        for (;;) {
-          const next = queue.shift();
-          if (next === undefined) return;
-          await processOne(next);
-        }
-      },
-    );
+    const workers = Array.from({ length: Math.min(4, queue.length) }, async () => {
+      for (;;) {
+        const next = queue.shift();
+        if (next === undefined) return;
+        await processOne(next);
+      }
+    });
     await Promise.allSettled(workers);
 
     return null;

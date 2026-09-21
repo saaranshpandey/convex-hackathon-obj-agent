@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { AlertCircle, ArrowRight, Loader2, Plus } from "lucide-react";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -7,6 +7,7 @@ import { canPublish, saleFlow } from "@/lib/saleFlow";
 import WorkspaceTabs from "@/components/WorkspaceTabs";
 import PhotoCanvas from "@/components/PhotoCanvas";
 import ObjectThumb from "@/components/ObjectThumb";
+import PreparationCard from "@/components/PreparationCard";
 import SaleReview from "@/components/SaleReview";
 import ListingDrawer from "@/components/ListingDrawer";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,12 @@ export default function Workspace({
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
   const flow = saleFlow(items, listings);
-  const preparing = starting || flow.working;
+  const [showPreparation, setShowPreparation] = useState(false);
+  const settlePreparation = useCallback(() => setShowPreparation(false), []);
+  useEffect(() => {
+    if (starting || flow.working) setShowPreparation(true);
+  }, [starting, flow.working]);
+  const preparing = starting || flow.working || showPreparation;
   const reviewing = !choosing && flow.started && !preparing;
   const scanning = cleanout.status === "analyzing";
   // Masks arrive after detection, so the photo shows plain boxes until they do.
@@ -79,6 +85,7 @@ export default function Workspace({
       await onContinue();
       setChoosing(false);
     } catch (cause) {
+      setShowPreparation(false);
       setError(cause instanceof Error ? cause.message : "Couldn't prepare your listings. Try again.");
     } finally {
       submitting.current = false;
@@ -137,20 +144,7 @@ export default function Workspace({
       </div>
 
       {preparing ? (
-        <div className="mx-auto max-w-lg rounded-2xl border border-line bg-surface p-6" role="status" aria-live="polite">
-          <div className="mb-5 flex items-center gap-3"><Loader2 className="size-5 animate-spin text-accent-deep" /><span className="text-sm">Preparing {flow.selected.length} {flow.selected.length === 1 ? "item" : "items"}</span></div>
-          <ul className="space-y-4">{flow.selected.map((item) => {
-            const done = flow.included.some((listing) => listing.itemId === item._id);
-            const failed = item.researchStatus === "failed";
-            return <li key={item._id} className="flex items-center justify-between gap-4 text-sm">
-              <span>{item.name}</span>
-              <span className="flex items-center gap-2 text-xs text-muted">
-                {!done && !failed && <Loader2 aria-hidden className="size-3.5 animate-spin" />}
-                {failed ? "Couldn't prepare" : done ? "Ready" : item.researchStatus === "ready_for_review" ? "Writing listing…" : "Finding price…"}
-              </span>
-            </li>;
-          })}</ul>
-        </div>
+        <PreparationCard imageUrl={imageUrl} items={flow.selected} working={starting || flow.working} onSettled={settlePreparation} />
       ) : reviewing ? (
         <SaleReview imageUrl={imageUrl} items={items} listings={listings}
           onEdit={onReviewListing} onBack={() => { setChoosing(true); onCloseDrawer(); }}
