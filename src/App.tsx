@@ -1,22 +1,32 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import TopNav from "@/components/TopNav";
 import EmptyState from "@/components/EmptyState";
+import RoomRail from "@/components/RoomRail";
 import Workspace from "@/components/Workspace";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import demoRoom from "@/assets/demo-room.svg";
+import { useToast } from "@/components/Toaster";
 import { prepareUpload } from "@/lib/image";
+import { titleFromFileName } from "@/lib/rooms";
 import { bboxOf, type Rect, type WorkspaceItem } from "@/lib/geometry";
 
 export default function App() {
-  const workspace = useQuery(api.cleanouts.latestForUser);
+  /** Which thread is open. Null means the newest room, so a fresh visit lands there. */
+  const [activeRoomId, setActiveRoomId] = useState<Id<"cleanouts"> | null>(null);
+  const rooms = useQuery(api.cleanouts.list);
+  const workspace = useQuery(api.cleanouts.workspace, {
+    cleanoutId: activeRoomId ?? undefined,
+  });
 
   const generateUploadUrl = useMutation(api.cleanouts.generateUploadUrl);
   const startCleanoutMutation = useMutation(api.cleanouts.start);
+  const renameRoom = useMutation(api.cleanouts.rename);
   const attachImage = useMutation(api.cleanouts.attachImage);
+  const replaceImage = useMutation(api.cleanouts.replaceImage);
   const markUploadFailed = useMutation(api.cleanouts.markUploadFailed);
   const retryAnalysis = useMutation(api.cleanouts.retryAnalysis);
   const toggleItem = useMutation(api.items.toggle);
@@ -28,9 +38,12 @@ export default function App() {
   const seedDemoRoom = useMutation(api.demo.seedRoom);
   const resetDemoData = useMutation(api.dev.resetDemoData);
 
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [replacing, setReplacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [composingNew, setComposingNew] = useState(false);
+  const [railOpen, setRailOpen] = useState(false);
   const [drawing, setDrawing] = useState(false);
   const [activeId, setActiveId] = useState<Id<"items"> | null>(null);
   const [hoveredId, setHoveredId] = useState<Id<"items"> | null>(null);
@@ -48,6 +61,31 @@ export default function App() {
   );
   const listings = workspace?.listings ?? [];
 
+  /** Downscales, uploads, and hands back what every photo mutation needs. */
+  const uploadPhoto = useCallback(
+    async (blob: Blob) => {
+      const prepared = await prepareUpload(blob);
+
+      const uploadUrl = await generateUploadUrl();
+      const result = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": prepared.blob.type },
+        body: prepared.blob,
+      });
+      if (!result.ok) {
+        throw new Error(`Upload failed with status ${result.status}`);
+      }
+      const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
+
+      return {
+        storageId,
+        imageWidth: prepared.width || undefined,
+        imageHeight: prepared.height || undefined,
+      };
+    },
+    [generateUploadUrl],
+  );
+
   const startCleanout = useCallback(
     async (blob: Blob, title: string) => {
       setBusy(true);
@@ -57,30 +95,11 @@ export default function App() {
       try {
         cleanoutId = await startCleanoutMutation({ title });
         // The workspace can now show its uploading state.
+        setActiveRoomId(cleanoutId);
         setActiveId(null);
         setComposingNew(false);
 
-        const prepared = await prepareUpload(blob);
-
-        const uploadUrl = await generateUploadUrl();
-        const result = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": prepared.blob.type },
-          body: prepared.blob,
-        });
-        if (!result.ok) {
-          throw new Error(`Upload failed with status ${result.status}`);
-        }
-        const { storageId } = (await result.json()) as {
-          storageId: Id<"_storage">;
-        };
-
-        await attachImage({
-          cleanoutId,
-          storageId,
-          imageWidth: prepared.width || undefined,
-          imageHeight: prepared.height || undefined,
-        });
+        await attachImage({ cleanoutId, ...(await uploadPhoto(blob)) });
       } catch (cause) {
         const message =
           cause instanceof Error
@@ -97,12 +116,7 @@ export default function App() {
         setBusy(false);
       }
     },
-    [
-      attachImage,
-      generateUploadUrl,
-      markUploadFailed,
-      startCleanoutMutation,
-    ],
+    [attachImage, markUploadFailed, startCleanoutMutation, uploadPhoto],
   );
 
   /**
@@ -115,23 +129,9 @@ export default function App() {
     setError(null);
     try {
       const response = await fetch(demoRoom);
-      const prepared = await prepareUpload(await response.blob());
+      const cleanoutId = await seedDemoRoom(await uploadPhoto(await response.blob()));
 
-      const uploadUrl = await generateUploadUrl();
-      const result = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": prepared.blob.type },
-        body: prepared.blob,
-      });
-      if (!result.ok) throw new Error(`Upload failed with status ${result.status}`);
-      const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
-
-      await seedDemoRoom({
-        storageId,
-        imageWidth: prepared.width || undefined,
-        imageHeight: prepared.height || undefined,
-      });
-
+      setActiveRoomId(cleanoutId);
       setActiveId(null);
       setComposingNew(false);
     } catch {
@@ -139,12 +139,13 @@ export default function App() {
     } finally {
       setBusy(false);
     }
-  }, [generateUploadUrl, seedDemoRoom]);
+  }, [seedDemoRoom, uploadPhoto]);
 
   const handleReset = useCallback(async () => {
     setBusy(true);
     try {
       await resetDemoData({});
+      setActiveRoomId(null);
       setActiveId(null);
       setComposingNew(false);
       setDrawing(false);
@@ -153,6 +154,59 @@ export default function App() {
       setBusy(false);
     }
   }, [resetDemoData]);
+
+  /**
+   * Swaps this room's photo in place rather than starting a thread. A failed
+   * upload must not destroy what the room already has, so the error goes to a
+   * toast instead of onto the cleanout.
+   */
+  const replacePhoto = useCallback(
+    async (cleanoutId: Id<"cleanouts">, blob: Blob) => {
+      setReplacing(true);
+      try {
+        await replaceImage({ cleanoutId, ...(await uploadPhoto(blob)) });
+        setActiveId(null);
+        setHoveredId(null);
+        setReviewingListingId(null);
+        setDrawing(false);
+      } catch (cause) {
+        toast.error(
+          cause instanceof Error ? cause.message : "Couldn't use that photo. Try another.",
+        );
+      } finally {
+        setReplacing(false);
+      }
+    },
+    [replaceImage, toast, uploadPhoto],
+  );
+
+  /** Opening a thread clears everything scoped to the one being left behind. */
+  const openRoom = useCallback((cleanoutId: Id<"cleanouts">) => {
+    setActiveRoomId(cleanoutId);
+    setComposingNew(false);
+    setRailOpen(false);
+    setDrawing(false);
+    setActiveId(null);
+    setHoveredId(null);
+    setReviewingListingId(null);
+    setError(null);
+  }, []);
+
+  const openComposer = useCallback(() => {
+    setComposingNew(true);
+    setRailOpen(false);
+    setDrawing(false);
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    if (!railOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setRailOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [railOpen]);
 
   const handleAddItem = useCallback(
     async (name: string, box: Rect) => {
@@ -169,19 +223,58 @@ export default function App() {
 
   const showEmptyState = workspace === null || composingNew;
 
+  const rail = (
+    <RoomRail
+      rooms={rooms}
+      activeId={workspace?.cleanout._id ?? activeRoomId}
+      composing={showEmptyState}
+      onSelect={openRoom}
+      onNew={openComposer}
+      onRename={(cleanoutId, title) => void renameRoom({ cleanoutId, title })}
+    />
+  );
+
   return (
     <MotionConfig reducedMotion="user"><div className="min-h-dvh">
       <TopNav
-        onHome={() => {
-          setDrawing(false);
-          setComposingNew(true);
-        }}
+        onHome={openComposer}
         onReset={import.meta.env.DEV ? handleReset : undefined}
         isDemo={workspace?.cleanout.isDemo === true}
+        onToggleRail={() => setRailOpen((open) => !open)}
       />
 
-      <main className="mx-auto w-full max-w-[1320px] px-4 pb-6 sm:px-8">
-        <AnimatePresence mode="wait">
+      <div className="mx-auto flex w-full max-w-[1320px] gap-6 px-4 pb-6 sm:px-8">
+        <aside className="sticky top-[72px] hidden h-[calc(100dvh-72px)] w-60 shrink-0 overflow-y-auto py-6 lg:block">
+          {rail}
+        </aside>
+
+        {/* Under lg the rail is a slide-over; the overlay closes it. */}
+        <AnimatePresence>
+          {railOpen && (
+            <motion.div
+              key="rail-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-ink/30 lg:hidden"
+              onClick={() => setRailOpen(false)}
+            >
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                onClick={(event) => event.stopPropagation()}
+                className="h-full w-72 max-w-[80%] overflow-y-auto bg-canvas p-3 shadow-[var(--shadow-lift)]"
+              >
+                {rail}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <main className="min-w-0 flex-1">
+          <AnimatePresence mode="wait">
           {workspace === undefined ? (
             <motion.div key="loading" exit={{ opacity: 0 }}>
               <WorkspaceSkeleton />
@@ -197,11 +290,10 @@ export default function App() {
               <EmptyState
                 busy={busy}
                 error={error}
-                onUpload={(file) => void startCleanout(file, file.name)}
-                onDemo={() => void startDemo()}
-                onBack={
-                  workspace !== null ? () => setComposingNew(false) : undefined
+                onUpload={(file) =>
+                  void startCleanout(file, titleFromFileName(file.name))
                 }
+                onDemo={() => void startDemo()}
               />
             </motion.div>
           ) : (
@@ -248,10 +340,11 @@ export default function App() {
                 onRetry={() =>
                   void retryAnalysis({ cleanoutId: workspace.cleanout._id })
                 }
-                onNewPhoto={() => {
-                  setDrawing(false);
-                  setComposingNew(true);
-                }}
+                onNewPhoto={openComposer}
+                replacing={replacing}
+                onReplacePhoto={(file) =>
+                  void replacePhoto(workspace.cleanout._id, file)
+                }
                 onContinue={() =>
                   startResearch({ cleanoutId: workspace.cleanout._id })
                 }
@@ -260,8 +353,9 @@ export default function App() {
               />
             </motion.div>
           )}
-        </AnimatePresence>
-      </main>
+          </AnimatePresence>
+        </main>
+      </div>
     </div></MotionConfig>
   );
 }

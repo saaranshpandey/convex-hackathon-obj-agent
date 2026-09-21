@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { Loader2 } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/Toaster";
+
+type Decision = "accept" | "decline" | "counter";
 
 /**
  * The offer state of a live listing. Deliberately no views or watchers — those
@@ -16,8 +19,11 @@ export default function OfferCard({ listing }: { listing: Doc<"listings"> }) {
   const simulateBuyerAccepts = useMutation(api.offers.simulateBuyerAcceptsCounter);
 
   const toast = useToast();
-  const [busy, setBusy] = useState(false);
+  // Which decision is in flight — `decide` calls the marketplace, so the button
+  // that was pressed has to say it is working, not just go dim.
+  const [pending, setPending] = useState<Decision | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const busy = pending !== null;
 
   if (offers === undefined) {
     return <div className="h-24 animate-pulse rounded-xl bg-canvas" />;
@@ -32,8 +38,8 @@ export default function OfferCard({ listing }: { listing: Doc<"listings"> }) {
     offers[0];
   if (offer === undefined) return null;
 
-  const run = async (action: "accept" | "decline" | "counter", amount?: number) => {
-    setBusy(true);
+  const run = async (action: Decision, amount?: number) => {
+    setPending(action);
     setError(null);
     try {
       const result = await decide({ offerId: offer._id, action, amount });
@@ -51,11 +57,21 @@ export default function OfferCard({ listing }: { listing: Doc<"listings"> }) {
         toast.error(reason);
       }
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   };
 
   const settled = offer.status === "accepted" || offer.status === "buyer_accepted";
+
+  const label = (action: Decision, idle: string, working: string) =>
+    pending === action ? (
+      <>
+        <Loader2 className="animate-spin" />
+        {working}
+      </>
+    ) : (
+      idle
+    );
 
   return (
     <div className="rounded-xl bg-canvas p-4">
@@ -81,7 +97,7 @@ export default function OfferCard({ listing }: { listing: Doc<"listings"> }) {
 
           <div className="mt-4 flex flex-wrap gap-2">
             <Button size="sm" variant="accent" disabled={busy} onClick={() => void run("accept")}>
-              Accept
+              {label("accept", "Accept", "Accepting…")}
             </Button>
             <Button
               size="sm"
@@ -94,10 +110,10 @@ export default function OfferCard({ listing }: { listing: Doc<"listings"> }) {
                 if (Number.isFinite(amount) && amount > 0) void run("counter", amount);
               }}
             >
-              Counter
+              {label("counter", "Counter", "Sending…")}
             </Button>
             <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run("decline")}>
-              Decline
+              {label("decline", "Decline", "Declining…")}
             </Button>
           </div>
         </>

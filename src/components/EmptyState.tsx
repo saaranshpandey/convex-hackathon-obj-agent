@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ArrowLeft, ImagePlus, Loader2 } from "lucide-react";
+import { ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -8,10 +8,9 @@ type Props = {
   error: string | null;
   onUpload: (file: File) => void;
   onDemo: () => void;
-  onBack?: () => void;
 };
 
-export default function EmptyState({ busy, error, onUpload, onDemo, onBack }: Props) {
+export default function EmptyState({ busy, error, onUpload, onDemo }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
@@ -31,7 +30,6 @@ export default function EmptyState({ busy, error, onUpload, onDemo, onBack }: Pr
 
   return (
     <section className="mx-auto max-w-lg py-12 text-center sm:py-20">
-      {onBack && <Button variant="ghost" size="sm" className="mb-8" onClick={onBack}><ArrowLeft />Back to your sale</Button>}
       <p className="text-xs font-medium text-muted">Photo → Choose items → Review & publish</p>
       <h1 className="mt-6 text-4xl font-semibold tracking-[-0.045em]">What would you like to sell?</h1>
       <p className="mt-3 text-sm text-muted">Add a photo. We'll find the items and suggest prices.</p>

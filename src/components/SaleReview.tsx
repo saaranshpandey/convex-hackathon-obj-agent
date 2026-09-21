@@ -63,7 +63,11 @@ export default function SaleReview({ imageUrl, items, listings, onEdit, onBack, 
                 <ObjectThumb imageUrl={imageUrl} bbox={item.bbox} className="h-14 max-w-20" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{listing?.title ?? item.name}</p>
-                  <p className="mt-1 text-xs text-muted">
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                    {(listing?.status === "publishing" ||
+                      (!listing && item.researchStatus !== "failed")) && (
+                      <Loader2 aria-hidden className="size-3 animate-spin" />
+                    )}
                     {!listing ? item.researchStatus === "failed" ? "Couldn't prepare this item" : "Waiting for the listing draft" :
                       listing.status === "publishing" ? "Publishing…" : listing.status === "failed" ? "Couldn't publish — try again" :
                       canPublish(listing) ? listing.condition.replace(/_/g, " ") :

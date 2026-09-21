@@ -29,7 +29,11 @@ type Props = {
   onToggleDrawing: () => void;
   onAddItem: (name: string, box: Rect) => void;
   onRetry: () => void;
+  /** Starts a new room — not the same thing as swapping this room's photo. */
   onNewPhoto: () => void;
+  /** A replacement photo is uploading for this room. */
+  replacing: boolean;
+  onReplacePhoto: (file: File) => void;
   onContinue: () => Promise<unknown>;
   onReviewListing: (listingId: Id<"listings">) => void;
   onCloseDrawer: () => void;
@@ -38,9 +42,10 @@ type Props = {
 export default function Workspace({
   cleanout, imageUrl, items, listings, activeId, hoveredId, drawing,
   reviewingListingId, onToggle, onHover, onRename, onRemove, onSelectAll,
-  onClear, onToggleDrawing, onAddItem, onRetry, onNewPhoto, onContinue,
-  onReviewListing, onCloseDrawer,
+  onClear, onToggleDrawing, onAddItem, onRetry, onNewPhoto, replacing,
+  onReplacePhoto, onContinue, onReviewListing, onCloseDrawer,
 }: Props) {
+  const photoInput = useRef<HTMLInputElement>(null);
   const [choosing, setChoosing] = useState(false);
   const [starting, setStarting] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -50,6 +55,10 @@ export default function Workspace({
   const preparing = starting || flow.working;
   const reviewing = !choosing && flow.started && !preparing;
   const scanning = cleanout.status === "analyzing";
+  // Masks arrive after detection, so the photo shows plain boxes until they do.
+  const tracing = items.filter((item) =>
+    ["pending", "processing"].includes(item.maskStatus),
+  ).length;
   const selectionLocked = flow.included.some((listing) => !canPublish(listing));
   const navigationLocked = publishing || flow.publishing;
   const activeTab = reviewing || preparing ? "listings" : "items";
@@ -77,6 +86,25 @@ export default function Workspace({
     }
   };
 
+  /** One picker serves every "Change photo" button in this workspace. */
+  const photoPicker = (
+    <input ref={photoInput} type="file" accept="image/*" className="hidden"
+      aria-label="Choose a replacement photo"
+      onChange={(event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (file) onReplacePhoto(file);
+      }} />
+  );
+
+  // A called helper, not a nested component, so it isn't remounted each render.
+  const changePhotoButton = (size?: "sm") => (
+    <Button variant="ghost" size={size} disabled={replacing}
+      onClick={() => photoInput.current?.click()}>
+      {replacing ? <><Loader2 className="animate-spin" />Adding photo…</> : "Change photo"}
+    </Button>
+  );
+
   if (cleanout.status === "uploading") {
     return <Card><Loader2 className="size-6 animate-spin text-muted" /><h1 className="mt-4 font-medium">Adding your photo…</h1></Card>;
   }
@@ -87,8 +115,9 @@ export default function Workspace({
       <p className="mt-2 text-sm text-muted">{cleanout.error ?? "Try another room photo."}</p>
       <div className="mt-5 flex gap-2">
         {cleanout.imageStorageId && <Button onClick={onRetry}>Try again</Button>}
-        <Button variant="ghost" onClick={onNewPhoto}>Change photo</Button>
+        {changePhotoButton()}
       </div>
+      {photoPicker}
     </Card>;
   }
 
@@ -110,7 +139,17 @@ export default function Workspace({
       {preparing ? (
         <div className="mx-auto max-w-lg rounded-2xl border border-line bg-surface p-6" role="status" aria-live="polite">
           <div className="mb-5 flex items-center gap-3"><Loader2 className="size-5 animate-spin text-accent-deep" /><span className="text-sm">Preparing {flow.selected.length} {flow.selected.length === 1 ? "item" : "items"}</span></div>
-          <ul className="space-y-4">{flow.selected.map((item) => <li key={item._id} className="flex items-center justify-between gap-4 text-sm"><span>{item.name}</span><span className="text-xs text-muted">{item.researchStatus === "failed" ? "Couldn't prepare" : flow.included.some((listing) => listing.itemId === item._id) ? "Ready" : item.researchStatus === "ready_for_review" ? "Writing listing…" : "Finding price…"}</span></li>)}</ul>
+          <ul className="space-y-4">{flow.selected.map((item) => {
+            const done = flow.included.some((listing) => listing.itemId === item._id);
+            const failed = item.researchStatus === "failed";
+            return <li key={item._id} className="flex items-center justify-between gap-4 text-sm">
+              <span>{item.name}</span>
+              <span className="flex items-center gap-2 text-xs text-muted">
+                {!done && !failed && <Loader2 aria-hidden className="size-3.5 animate-spin" />}
+                {failed ? "Couldn't prepare" : done ? "Ready" : item.researchStatus === "ready_for_review" ? "Writing listing…" : "Finding price…"}
+              </span>
+            </li>;
+          })}</ul>
         </div>
       ) : reviewing ? (
         <SaleReview imageUrl={imageUrl} items={items} listings={listings}
@@ -121,11 +160,12 @@ export default function Workspace({
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
             <div className="min-w-0">
               <PhotoCanvas imageUrl={imageUrl} items={items} scanning={scanning} scanLabel="Finding items…"
+                statusHint={tracing > 0 ? `${items.length - tracing} of ${items.length} items ready` : null}
                 drawing={drawing} hoveredId={hoveredId} activeId={activeId}
                 onToggle={selectionLocked ? () => {} : onToggle} onHover={onHover} onAddItem={onAddItem} onCancelDrawing={onToggleDrawing} />
               {!scanning && !selectionLocked && <div className="mt-3 flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={onToggleDrawing}><Plus />{drawing ? "Cancel selection" : "Add missing item"}</Button>
-                <Button variant="ghost" size="sm" onClick={onNewPhoto}>Change photo</Button>
+                {changePhotoButton("sm")}
               </div>}
             </div>
             {!scanning && <div className="rounded-2xl border border-line bg-surface p-4">
@@ -170,6 +210,8 @@ export default function Workspace({
             onClose={onCloseDrawer} />
         )}
       </AnimatePresence>
+
+      {photoPicker}
     </div>
   );
 }

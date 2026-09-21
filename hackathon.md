@@ -3,16 +3,16 @@
 - **Project:** Roomsale
 - **Event:** Convex All Gas Hackathon
 - **What it does:** Upload one photo of a room, get each sellable object segmented and selectable inside the photo, and choose what to put up for sale.
-- **Live app:** not deployed
+- **Live app:** https://adjoining-gerbil-124.convex.site
 - **Repo:** https://github.com/saaranshpandey/convex-hackathon-obj-agent
 - **Frontend:** Convex static hosting
-- **Convex deployment:** not deployed
-- **Components:** none
-- **Convex features:** schema, tables, indexes, queries, mutations, actions, internal functions, scheduled functions, HTTP actions, file storage, realtime queries
-- **Auth:** none
+- **Convex deployment:** https://adjoining-gerbil-124.convex.cloud
+- **Components:** @convex-dev/static-hosting
+- **Convex features:** schema, tables, indexes, queries, mutations, actions, internal functions, scheduled functions, HTTP actions, file storage, realtime queries, environment variables, registered components
+- **Auth:** Convex Auth
 - **AI models:** gpt-5.6-luna, fal-ai/sam2/image
 - **Started:** 2026-09-07T05:06:14Z
-- **Last updated:** 2026-09-08T00:26:33Z
+- **Last updated:** 2026-09-21T00:31:25Z
 
 ## Log
 
@@ -142,3 +142,84 @@ seeded room with no AI calls: scan 1.9s, research to drafts 3.9s, mock publish
 0.7s, offer to owner notification 0.1s, counter and buyer acceptance settling
 the listing as sold (`convex/demo.ts`, `convex/demoData.ts`, `convex/offers.ts`,
 `src/components/Toaster.tsx`, `src/components/ObjectCanvas.tsx`).
+
+### 2026-09-13 - 52aff35
+Real eBay publishing works: an approved listing goes out to the eBay sandbox as
+an inventory item, an offer and a published listing, and came back with a live
+listing URL. Two real failure modes it hit along the way are now handled rather
+than surfaced as a dead end. Product photos are cropped to the item's own
+bounding box before upload, so an eBay listing shows the object instead of the
+whole room (`convex/imageCrop.ts`, jimp). Pricing research is cached by product
+identity, so a second unit of the same product — in this room or a later one —
+skips both the Firecrawl search and the OpenAI pricing call. The sale flow was
+rebuilt around one path: Items and Listings tabs over a single review screen,
+with the flow's rules pulled out of the components into a tested helper
+(`convex/ebay/sandbox.ts`, `convex/listingPublish.ts`, `convex/priceResearch.ts`,
+`convex/schema.ts` `priceResearchCache`, `src/lib/saleFlow.ts`,
+`src/components/SaleReview.tsx`, `src/components/WorkspaceTabs.tsx`,
+`tests/ui/saleFlow.test.ts`).
+
+### 2026-09-18 - 0deb93e
+Added sign-in and made ownership real. Convex Auth with Google replaced the
+browser-generated session id, and every surface now derives the caller from the
+token: rooms, items, listings, offers and the agent thread all go through one
+set of ownership checks, so a second signed-in user asking for someone else's
+row gets "Not found" rather than data. eBay connections became per-user, carried
+through OAuth on a one-time state code instead of a guessable parameter, and
+publishing verifies the listing's owner before it calls eBay. Each owner is
+emailed at their own address, an inbound reply is checked against the sender we
+wrote to, and going live sends a confirmation. A connection made in one eBay
+mode now reads as not connected in the other, so a mode switch asks the user to
+reconnect instead of failing mid-publish. Covered by new function tests for
+rooms, offers, eBay and email (`convex/auth.ts`, `convex/auth.config.ts`,
+`convex/access.ts`, `convex/ebay/oauthState.ts`, `convex/agentMail/sender.ts`,
+`src/components/AuthGate.tsx`, `src/components/SignIn.tsx`,
+`tests/convex/rooms.test.ts`, `tests/convex/ebay.test.ts`).
+
+### 2026-09-19 - 2c8545d
+Publishing stopped depending on one hard-coded seller account. Each seller now
+gets their own eBay merchant location and fulfillment, payment and return
+policies, created once from the ZIP they enter when connecting and reused after
+that; the ZIP travels through eBay's redirect on the same one-time state code.
+Each item resolves its own eBay category from its identification, the condition
+values that category actually accepts, and the aspects eBay requires for it —
+filled from what identification already established and never invented. The
+one-off `convex/ebaySetup.ts` script was deleted once the real path covered it.
+Category rules, required-detail filling and the resolver each have fixture tests
+(`convex/ebay/sellerSetup.ts`, `convex/ebay/categoryRules.ts`,
+`convex/ebay/itemDetails.ts`, `convex/ebay/prepare.ts`,
+`convex/ebay/postalCode.ts`, `tests/ebay/`).
+
+### 2026-09-20 - 0c802eb
+Added production mode, so a real seller can list to real eBay — and with it what
+eBay requires before granting production access. Account-deletion notices are
+verified against eBay's own signing keys, fetched by key ID and cached, and the
+`challenge_code` handshake is served from an HTTP action; a notice that fails
+verification is refused with the reason logged rather than silently accepted, and
+a verified one deletes that seller's stored connection. Each seller's immutable
+eBay user ID is saved at connect time, because that is what a deletion notice is
+matched on. A demo room in production is published through the mock publisher, so
+seeded objects can never reach real eBay or be billed. Saving an inventory item
+retries eBay's 5xx responses and logs what was sent. Convex features: HTTP
+actions, actions, internal functions, environment variables
+(`convex/ebay/notificationSignature.ts`, `convex/ebayNotifications.ts`,
+`convex/ebay/identity.ts`, `convex/ebay/index.ts`, `convex/listingPublish.ts`,
+`convex/http.ts`, `tests/convex/ebayNotifications.test.ts`,
+`tests/ebay/publisher.test.ts`).
+
+### 2026-09-21 - working tree
+Rooms became threads. Every room the signed-in user owns is listed in a rail
+alongside the workspace — the way a conversation list works — so an earlier room
+stays reachable instead of being replaced by the newest one; opening one loads
+that room and the existing flow continues from wherever it left off. Each row
+carries a derived status so a glance says whether that sale is done: Scanning,
+Preparing, In review, Live · n, Sold. The rail's query returns tallies rather
+than documents, and a room can be renamed in place; uploads now title a room
+from the filename with its extension dropped. The scanning overlay was rebuilt
+so it is actually visible — a bright leading edge with the band trailing behind
+it, viewfinder brackets, and a static fallback for reduced-motion users, which
+the previous transform-only sweep left blank. Verified with 130 passing tests
+including the new room-list, rename and ownership cases (`convex/cleanouts.ts`,
+`src/components/RoomRail.tsx`, `src/lib/rooms.ts`, `src/App.tsx`,
+`src/components/PhotoCanvas.tsx`, `tests/convex/rooms.test.ts`,
+`tests/ui/rooms.test.ts`).

@@ -1,4 +1,4 @@
-import { Plus, RotateCcw, Scan } from "lucide-react";
+import { PanelLeft, Plus, RotateCcw, Scan } from "lucide-react";
 import AccountMenu from "@/components/AccountMenu";
 
 type Props = {
@@ -7,26 +7,37 @@ type Props = {
   isDemo?: boolean;
   /** Provided only in development — wipes this session's Convex data. */
   onReset?: () => void;
+  /** Opens the room rail, which is a slide-over below the lg breakpoint. */
+  onToggleRail: () => void;
 };
 
 export default function TopNav({
   onHome,
-  isDemo = false, onReset }: Props) {
+  isDemo = false, onReset, onToggleRail }: Props) {
   return (
     <header className="sticky top-0 z-30 border-b border-black/5 bg-canvas/80 backdrop-blur-xl">
       <div className="mx-auto flex h-[72px] w-full max-w-[1320px] items-center justify-between gap-3 px-4 sm:px-8">
-        <button
-          onClick={onHome}
-          className="group flex items-center gap-2.5 rounded-full pr-2 text-left"
-          aria-label="Start a new scan"
-        >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-ink text-white shadow-sm">
-            <Scan className="size-5" strokeWidth={1.75} />
-          </span>
-          <span className="text-[18px] font-semibold tracking-[-0.04em] text-ink">
-            Roomsale
-          </span>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onToggleRail}
+            aria-label="Show your rooms"
+            className="-ml-1.5 flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-ink/5 hover:text-ink lg:hidden"
+          >
+            <PanelLeft className="size-[18px]" strokeWidth={1.75} />
+          </button>
+          <button
+            onClick={onHome}
+            className="group flex items-center gap-2.5 rounded-full pr-2 text-left"
+            aria-label="Start a new scan"
+          >
+            <span className="flex size-9 items-center justify-center rounded-xl bg-ink text-white shadow-sm">
+              <Scan className="size-5" strokeWidth={1.75} />
+            </span>
+            <span className="text-[18px] font-semibold tracking-[-0.04em] text-ink">
+              Roomsale
+            </span>
+          </button>
+        </div>
 
         <nav aria-label="Main navigation" className="flex items-center gap-1 sm:gap-3">
           {isDemo && (
