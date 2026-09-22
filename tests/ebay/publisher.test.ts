@@ -13,7 +13,7 @@ const input: PublishInput = {
   accessToken: "seller-token",
   env: "production",
   categoryId: "80053",
-  merchantLocationKey: "roomsale-94105",
+  merchantLocationKey: "roomly-94105",
   fulfillmentPolicyId: "F1",
   paymentPolicyId: "P1",
   returnPolicyId: "R1",

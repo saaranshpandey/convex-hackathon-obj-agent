@@ -18,7 +18,7 @@ describe("isValidPostalCode", () => {
 
 describe("locationKeyFor", () => {
   it("uses only the first five digits, so a ZIP+4 shares its ZIP's location", () => {
-    expect(locationKeyFor("94105")).toBe("roomsale-94105");
-    expect(locationKeyFor(" 94105-1234 ")).toBe("roomsale-94105");
+    expect(locationKeyFor("94105")).toBe("roomly-94105");
+    expect(locationKeyFor(" 94105-1234 ")).toBe("roomly-94105");
   });
 });

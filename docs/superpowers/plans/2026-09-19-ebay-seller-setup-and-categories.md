@@ -17,7 +17,7 @@
   - No ZIP at publish: `Reconnect eBay and enter your ZIP code — it's needed to set up your shipping location.`
   - Invalid ZIP at connect: `Enter a valid US ZIP code (for example 94105).`
   - No category: `Couldn't find an eBay category for "<query>".` (`<query>` is the category query text)
-- Seller-created object names (used to find existing ones): `Roomsale Standard Shipping`, `Roomsale Standard Payment`, `Roomsale Standard Returns`. Location key: `roomsale-<first 5 digits of ZIP>`.
+- Seller-created object names (used to find existing ones): `Roomly Standard Shipping`, `Roomly Standard Payment`, `Roomly Standard Returns`. Location key: `roomly-<first 5 digits of ZIP>`.
 - Defaults unchanged from today: flat $5 USPS Priority, 3-day handling; payment not immediate; 30-day returns, buyer pays return shipping; default package 5 lb, 12x12x12 in.
 - Unknown item details are sent as `Does not apply`; an unknown Brand is sent as `Unbranded`. Never guess a measurement.
 - Codebase conventions: two-argument `ctx.db.get("table", id)`, `ctx.db.patch("table", id, ...)`; object-form Convex functions with `args` validators; no `returns:` validators (none exist in this repo, ignore the `convex-lint` hook nags); no code comments except for a non-obvious WHY.
@@ -103,8 +103,8 @@ describe("isValidPostalCode", () => {
 
 describe("locationKeyFor", () => {
   it("uses only the first five digits, so a ZIP+4 shares its ZIP's location", () => {
-    expect(locationKeyFor("94105")).toBe("roomsale-94105");
-    expect(locationKeyFor(" 94105-1234 ")).toBe("roomsale-94105");
+    expect(locationKeyFor("94105")).toBe("roomly-94105");
+    expect(locationKeyFor(" 94105-1234 ")).toBe("roomly-94105");
   });
 });
 ```
@@ -122,7 +122,7 @@ export function isValidPostalCode(value: string): boolean {
 }
 
 export function locationKeyFor(postalCode: string): string {
-  return `roomsale-${postalCode.trim().slice(0, 5)}`;
+  return `roomly-${postalCode.trim().slice(0, 5)}`;
 }
 ```
 
@@ -349,8 +349,8 @@ const input = { env: "sandbox" as const, accessToken: "seller-token", postalCode
 
 const freshSeller: FakeHandlers = {
   "POST /sell/account/v1/program/opt_in": () => ({ status: 200 }),
-  "GET /sell/inventory/v1/location/roomsale-94105": () => ({ status: 404, json: {} }),
-  "POST /sell/inventory/v1/location/roomsale-94105": () => ({ status: 204 }),
+  "GET /sell/inventory/v1/location/roomly-94105": () => ({ status: 404, json: {} }),
+  "POST /sell/inventory/v1/location/roomly-94105": () => ({ status: 204 }),
   "GET /sell/account/v1/fulfillment_policy": () => ({ status: 200, json: { total: 0 } }),
   "POST /sell/account/v1/fulfillment_policy": () => ({ status: 201, json: { fulfillmentPolicyId: "F1" } }),
   "GET /sell/account/v1/payment_policy": () => ({ status: 200, json: { total: 0 } }),
@@ -361,23 +361,23 @@ const freshSeller: FakeHandlers = {
 
 const returningSeller: FakeHandlers = {
   "POST /sell/account/v1/program/opt_in": () => ({ status: 409, json: { errors: [{ message: "already" }] } }),
-  "GET /sell/inventory/v1/location/roomsale-94105": () => ({ status: 200, json: {} }),
+  "GET /sell/inventory/v1/location/roomly-94105": () => ({ status: 200, json: {} }),
   "GET /sell/account/v1/fulfillment_policy": () => ({
     status: 200,
     json: {
       fulfillmentPolicies: [
         { name: "Someone else's policy", fulfillmentPolicyId: "X" },
-        { name: "Roomsale Standard Shipping", fulfillmentPolicyId: "F9" },
+        { name: "Roomly Standard Shipping", fulfillmentPolicyId: "F9" },
       ],
     },
   }),
   "GET /sell/account/v1/payment_policy": () => ({
     status: 200,
-    json: { paymentPolicies: [{ name: "Roomsale Standard Payment", paymentPolicyId: "P9" }] },
+    json: { paymentPolicies: [{ name: "Roomly Standard Payment", paymentPolicyId: "P9" }] },
   }),
   "GET /sell/account/v1/return_policy": () => ({
     status: 200,
-    json: { returnPolicies: [{ name: "Roomsale Standard Returns", returnPolicyId: "R9" }] },
+    json: { returnPolicies: [{ name: "Roomly Standard Returns", returnPolicyId: "R9" }] },
   }),
 };
 
@@ -388,7 +388,7 @@ describe("ensureSellerSetup", () => {
     const setup = await ensureSellerSetup(input);
 
     expect(setup).toEqual({
-      locationKey: "roomsale-94105",
+      locationKey: "roomly-94105",
       fulfillmentPolicyId: "F1",
       paymentPolicyId: "P1",
       returnPolicyId: "R1",
@@ -396,7 +396,7 @@ describe("ensureSellerSetup", () => {
     const posts = calls.filter((c) => c.method === "POST").map((c) => c.path);
     expect(posts).toEqual([
       "/sell/account/v1/program/opt_in",
-      "/sell/inventory/v1/location/roomsale-94105",
+      "/sell/inventory/v1/location/roomly-94105",
       "/sell/account/v1/fulfillment_policy",
       "/sell/account/v1/payment_policy",
       "/sell/account/v1/return_policy",
@@ -406,7 +406,7 @@ describe("ensureSellerSetup", () => {
       location: { address: { postalCode: "94105", country: "US" } },
     });
     const shipping = calls.find((c) => c.path === "/sell/account/v1/fulfillment_policy" && c.method === "POST");
-    expect(shipping?.body).toMatchObject({ name: "Roomsale Standard Shipping", marketplaceId: "EBAY_US" });
+    expect(shipping?.body).toMatchObject({ name: "Roomly Standard Shipping", marketplaceId: "EBAY_US" });
   });
 
   it("reuses an existing location and policies, and tolerates 'already opted in'", async () => {
@@ -415,7 +415,7 @@ describe("ensureSellerSetup", () => {
     const setup = await ensureSellerSetup(input);
 
     expect(setup).toEqual({
-      locationKey: "roomsale-94105",
+      locationKey: "roomly-94105",
       fulfillmentPolicyId: "F9",
       paymentPolicyId: "P9",
       returnPolicyId: "R9",
@@ -440,7 +440,7 @@ describe("ensureSellerSetup", () => {
   it("keeps a ZIP+4 in the address but shares the 5-digit location key", async () => {
     const calls = fakeEbay({
       ...freshSeller,
-      "GET /sell/inventory/v1/location/roomsale-94105": () => ({ status: 404, json: {} }),
+      "GET /sell/inventory/v1/location/roomly-94105": () => ({ status: 404, json: {} }),
     });
 
     await ensureSellerSetup({ ...input, postalCode: "94105-1234" });
@@ -478,7 +478,7 @@ type PolicySpec = {
 };
 
 const FULFILLMENT: PolicySpec = {
-  name: "Roomsale Standard Shipping",
+  name: "Roomly Standard Shipping",
   path: "/sell/account/v1/fulfillment_policy",
   listKey: "fulfillmentPolicies",
   idKey: "fulfillmentPolicyId",
@@ -503,7 +503,7 @@ const FULFILLMENT: PolicySpec = {
 };
 
 const PAYMENT: PolicySpec = {
-  name: "Roomsale Standard Payment",
+  name: "Roomly Standard Payment",
   path: "/sell/account/v1/payment_policy",
   listKey: "paymentPolicies",
   idKey: "paymentPolicyId",
@@ -511,7 +511,7 @@ const PAYMENT: PolicySpec = {
 };
 
 const RETURNS: PolicySpec = {
-  name: "Roomsale Standard Returns",
+  name: "Roomly Standard Returns",
   path: "/sell/account/v1/return_policy",
   listKey: "returnPolicies",
   idKey: "returnPolicyId",
@@ -558,7 +558,7 @@ async function ensureLocation(
   await ebayRequest(env, accessToken, "POST", `/sell/inventory/v1/location/${key}`, {
     location: { address: { postalCode: postalCode.trim(), country: "US" } },
     locationTypes: ["WAREHOUSE"],
-    name: `Roomsale ship-from ${key.slice(-5)}`,
+    name: `Roomly ship-from ${key.slice(-5)}`,
     merchantLocationStatus: "ENABLED",
   });
   return key;
@@ -1771,7 +1771,7 @@ describe("the seller's ZIP code", () => {
     await t.mutation(internal.ebayAuth.saveSellerSetup, {
       userId: alice.userId,
       sellerSetup: {
-        locationKey: "roomsale-94105",
+        locationKey: "roomly-94105",
         fulfillmentPolicyId: "F1",
         paymentPolicyId: "P1",
         returnPolicyId: "R1",

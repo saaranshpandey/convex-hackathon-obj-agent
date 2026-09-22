@@ -13,7 +13,7 @@ type PolicySpec = {
 };
 
 const FULFILLMENT: PolicySpec = {
-  name: "Roomsale Standard Shipping",
+  name: "Roomly Standard Shipping",
   path: "/sell/account/v1/fulfillment_policy",
   listKey: "fulfillmentPolicies",
   idKey: "fulfillmentPolicyId",
@@ -38,7 +38,7 @@ const FULFILLMENT: PolicySpec = {
 };
 
 const PAYMENT: PolicySpec = {
-  name: "Roomsale Standard Payment",
+  name: "Roomly Standard Payment",
   path: "/sell/account/v1/payment_policy",
   listKey: "paymentPolicies",
   idKey: "paymentPolicyId",
@@ -46,7 +46,7 @@ const PAYMENT: PolicySpec = {
 };
 
 const RETURNS: PolicySpec = {
-  name: "Roomsale Standard Returns",
+  name: "Roomly Standard Returns",
   path: "/sell/account/v1/return_policy",
   listKey: "returnPolicies",
   idKey: "returnPolicyId",
@@ -93,7 +93,7 @@ async function ensureLocation(
   await ebayRequest(env, accessToken, "POST", `/sell/inventory/v1/location/${key}`, {
     location: { address: { postalCode: postalCode.trim(), country: "US" } },
     locationTypes: ["WAREHOUSE"],
-    name: `Roomsale ship-from ${key.slice(-5)}`,
+    name: `Roomly ship-from ${key.slice(-5)}`,
     merchantLocationStatus: "ENABLED",
   });
   return key;

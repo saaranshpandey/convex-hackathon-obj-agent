@@ -6,7 +6,7 @@
 
 const BASE_URL = "https://api.agentmail.to";
 /** Fixed so re-running setup returns the same inbox instead of a new one. */
-const INBOX_CLIENT_ID = "roomsale-owner-inbox";
+const INBOX_CLIENT_ID = "roomly-owner-inbox";
 
 async function agentMailRequest(
   apiKey: string,
@@ -45,7 +45,7 @@ export async function getOrCreateInbox(
 
   const payload = await agentMailRequest(apiKey, "POST", "/v0/inboxes", {
     client_id: INBOX_CLIENT_ID,
-    display_name: "Roomsale selling agent",
+    display_name: "Roomly selling agent",
   });
 
   const inboxId = payload.inbox_id;
@@ -107,7 +107,7 @@ export async function createWebhook(
   const payload = await agentMailRequest(apiKey, "POST", "/v0/webhooks", {
     url: input.url,
     event_types: ["message.received"],
-    client_id: "roomsale-inbound-webhook",
+    client_id: "roomly-inbound-webhook",
   });
 
   const webhookId = payload.webhook_id;

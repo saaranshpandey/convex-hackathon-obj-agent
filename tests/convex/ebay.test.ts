@@ -226,7 +226,7 @@ describe("the seller's ZIP code", () => {
     await t.mutation(internal.ebayAuth.saveSellerSetup, {
       userId: alice.userId,
       sellerSetup: {
-        locationKey: "roomsale-94105",
+        locationKey: "roomly-94105",
         fulfillmentPolicyId: "F1",
         paymentPolicyId: "P1",
         returnPolicyId: "R1",

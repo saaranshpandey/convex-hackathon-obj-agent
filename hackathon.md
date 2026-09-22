@@ -1,6 +1,6 @@
 # Hackathon log
 
-- **Project:** Roomsale
+- **Project:** Roomly
 - **Event:** Convex All Gas Hackathon
 - **What it does:** Upload one photo of a room, get each sellable object segmented and selectable inside the photo, then price each item, draft eBay listings, publish them to your own eBay account, and handle buyer offers by email.
 - **Live app:** https://adjoining-gerbil-124.convex.site

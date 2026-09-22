@@ -35,8 +35,8 @@ git switch -c feature/google-auth
 **H1. Create the Google OAuth client** (needed before sign-in can be verified, first used in Task 1 step 9):
 
 1. Go to https://console.cloud.google.com, create or pick a project.
-2. In "Google Auth Platform" (formerly "OAuth consent screen"): choose **External**, app name `Roomsale`, add a support email, save. Leave it in **Testing** for now and add your own Google account as a **test user**.
-3. Go to Credentials, then Create credentials, then **OAuth client ID**, application type **Web application**, name `Roomsale`.
+2. In "Google Auth Platform" (formerly "OAuth consent screen"): choose **External**, app name `Roomly`, add a support email, save. Leave it in **Testing** for now and add your own Google account as a **test user**.
+3. Go to Credentials, then Create credentials, then **OAuth client ID**, application type **Web application**, name `Roomly`.
 4. Under **Authorized redirect URIs** add both:
    - `https://scrupulous-newt-316.convex.site/api/auth/callback/google`
    - `https://adjoining-gerbil-124.convex.site/api/auth/callback/google`
@@ -2463,7 +2463,7 @@ export default function SignIn() {
       <span className="flex size-12 items-center justify-center rounded-2xl bg-ink text-white shadow-sm">
         <Scan className="size-6" strokeWidth={1.75} />
       </span>
-      <h1 className="mt-6 text-3xl font-semibold tracking-[-0.045em]">Roomsale</h1>
+      <h1 className="mt-6 text-3xl font-semibold tracking-[-0.045em]">Roomly</h1>
       <p className="mt-3 text-sm text-muted">
         Sign in to scan a room, price what's in it, and list it for sale.
       </p>

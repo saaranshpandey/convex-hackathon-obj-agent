@@ -1,4 +1,4 @@
-import { PanelLeft, Plus, RotateCcw, Scan } from "lucide-react";
+import { PanelLeft, Plus, RotateCcw } from "lucide-react";
 import AccountMenu from "@/components/AccountMenu";
 
 type Props = {
@@ -30,11 +30,17 @@ export default function TopNav({
             className="group flex items-center gap-2.5 rounded-full pr-2 text-left"
             aria-label="Start a new scan"
           >
-            <span className="flex size-9 items-center justify-center rounded-xl bg-ink text-white shadow-sm">
-              <Scan className="size-5" strokeWidth={1.75} />
-            </span>
+            {/* The mark is cropped out of the lockup; the wordmark next to it
+                is live text, so the tile carries the mark alone. */}
+            <img
+              src="/roomly-mark.png"
+              alt=""
+              width={36}
+              height={36}
+              className="size-9 rounded-xl bg-white object-cover shadow-sm ring-1 ring-black/5"
+            />
             <span className="text-[18px] font-semibold tracking-[-0.04em] text-ink">
-              Roomsale
+              Roomly
             </span>
           </button>
         </div>

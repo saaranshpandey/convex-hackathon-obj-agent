@@ -5,5 +5,5 @@ export function isValidPostalCode(value: string): boolean {
 }
 
 export function locationKeyFor(postalCode: string): string {
-  return `roomsale-${postalCode.trim().slice(0, 5)}`;
+  return `roomly-${postalCode.trim().slice(0, 5)}`;
 }

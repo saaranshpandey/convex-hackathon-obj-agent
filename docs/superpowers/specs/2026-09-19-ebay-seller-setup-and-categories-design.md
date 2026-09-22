@@ -32,11 +32,11 @@ What eBay's sandbox returned for our kinds of items (checked 2026-09-19 with an 
 - Data: `ebayConnections` gains `shipFromPostalCode?: string` and `sellerSetup?: { locationKey, fulfillmentPolicyId, paymentPolicyId, returnPolicyId }`. `ebayOauthStates` gains `postalCode?: string`.
 - ZIP flow (real eBay mode only): the UI asks for a ZIP; `ebayAuth.connect({ postalCode })` validates it (`12345` or `12345-6789`), stores it on the one-time state row; `consumeState` returns `{ userId, postalCode }`; the callback passes it to `saveConnection`. Demo mode ignores ZIP.
 - `convex/ebay/sellerSetup.ts` (plain fetch functions, no database access):
-  - `isValidPostalCode(zip)`, `locationKeyFor(zip)` (returns `roomsale-<zip>`).
+  - `isValidPostalCode(zip)`, `locationKeyFor(zip)` (returns `roomly-<zip>`).
   - `ensureSellerSetup({ env, accessToken, postalCode })` returns a `SellerSetup`:
     1. Opt in to `SELLING_POLICY_MANAGEMENT`; an "already opted in" outcome is fine.
     2. Location: `GET /sell/inventory/v1/location/{key}`; on 404, create it with `{ postalCode, country: "US" }`.
-    3. Fulfillment, payment and return policies: list the seller's policies for `EBAY_US`, reuse one whose name matches ours (`Roomsale Standard Shipping`, `Roomsale Standard Payment`, `Roomsale Standard Returns`), otherwise create it.
+    3. Fulfillment, payment and return policies: list the seller's policies for `EBAY_US`, reuse one whose name matches ours (`Roomly Standard Shipping`, `Roomly Standard Payment`, `Roomly Standard Returns`), otherwise create it.
   - Defaults unchanged from today: flat $5 USPS Priority, 3-day handling; payment not immediate; 30-day returns, buyer pays return shipping.
 - A stored `sellerSetup` is reused while `sellerSetup.locationKey === locationKeyFor(shipFromPostalCode)`; otherwise the setup is re-run (idempotent) and saved via `internal.ebayAuth.saveSellerSetup`.
 
