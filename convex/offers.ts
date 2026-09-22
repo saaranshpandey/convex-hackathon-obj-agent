@@ -209,6 +209,12 @@ export const simulateBuyerAcceptsCounter = mutation({
       createdAt: Date.now(),
     });
 
+    await ctx.scheduler.runAfter(0, internal.agentMail.sendSoldEmail, {
+      listingId: offer.listingId,
+      amount: settledAt,
+      viaCounter: true,
+    });
+
     return null;
   },
 });
@@ -422,6 +428,16 @@ export const applyDecision = internalAction({
       text,
       amount: settled,
     });
+
+    // Only a sale earns an email, and only here — the claim above is written
+    // before the marketplace call and `revertDecision` can still undo it.
+    if (args.action === "accept" && settled !== undefined) {
+      await ctx.runAction(internal.agentMail.sendSoldEmail, {
+        listingId,
+        amount: settled,
+        viaCounter: false,
+      });
+    }
 
     return { ok: true };
   },

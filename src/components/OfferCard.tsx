@@ -75,15 +75,12 @@ export default function OfferCard({ listing }: { listing: Doc<"listings"> }) {
 
   return (
     <div className="rounded-xl bg-canvas p-4">
+      {/* A simulated offer reads exactly like a real one. What produced it is
+          still recorded on `offers.source`. */}
       <div className="flex items-baseline justify-between">
         <p className="text-sm text-muted">
           Listed at <span className="font-medium text-ink">${listing.price}</span>
         </p>
-        {offer.source === "mock" && (
-          <span className="rounded-full bg-line px-2 py-0.5 text-[10px] font-medium tracking-wide text-muted uppercase">
-            Demo
-          </span>
-        )}
       </div>
 
       {offer.status === "pending" && (

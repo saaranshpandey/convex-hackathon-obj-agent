@@ -14,7 +14,7 @@ import { parseReply, type ParsedAction } from "./agentMail/parseReply";
 import { isValidAmount } from "./money";
 import { ownerEmailForCleanout, requireOwnedListing } from "./access";
 import { senderMatchesOwner } from "./agentMail/sender";
-import { listingLiveEmail } from "./agentMail/messages";
+import { listingLiveEmail, listingSoldEmail } from "./agentMail/messages";
 
 const CONFIDENCE_THRESHOLD = 0.6;
 
@@ -414,6 +414,45 @@ export const handleInboundReply = internalAction({
         agentMailThreadId: args.threadId,
       });
     }
+
+    return null;
+  },
+});
+
+/**
+ * The sale confirmation. The matching `agentMessages` row is written by the
+ * mutation that settled the sale, so the thread reads the same either way —
+ * this only adds the email, which that path never sent.
+ */
+export const sendSoldEmail = internalAction({
+  args: {
+    listingId: v.id("listings"),
+    amount: v.number(),
+    viaCounter: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const context: {
+      listing: Doc<"listings">;
+      itemName: string;
+      ownerEmail: string | null;
+    } | null = await ctx.runQuery(internal.agentMail.contextForListing, {
+      listingId: args.listingId,
+    });
+    if (context === null) return null;
+
+    const { listing, ownerEmail } = context;
+    const apiKey = env.AGENTMAIL_API_KEY?.trim();
+    if (!ownerEmail || !apiKey) return null;
+
+    const { subject, text } = listingSoldEmail({
+      title: listing.title,
+      price: args.amount,
+      viaCounter: args.viaCounter,
+      mode: listing.publishMode ?? "mock",
+    });
+
+    const inbox = await getOrCreateInbox(apiKey, env.AGENTMAIL_INBOX_ID?.trim());
+    await sendMessage(apiKey, inbox.inboxId, { to: ownerEmail, subject, text });
 
     return null;
   },
