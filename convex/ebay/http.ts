@@ -36,6 +36,7 @@ export async function ebayRequest(
     throw new EbayError(
       `eBay ${method} ${path} failed (${response.status}): ${detail.slice(0, 500)}`,
       response.status,
+      detail,
     );
   }
 

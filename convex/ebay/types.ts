@@ -1,9 +1,12 @@
 export class EbayError extends Error {
   readonly status?: number;
-  constructor(message: string, status?: number) {
+  /** Raw response body, so callers can read eBay's own error codes. */
+  readonly body?: string;
+  constructor(message: string, status?: number, body?: string) {
     super(message);
     this.name = "EbayError";
     this.status = status;
+    this.body = body;
   }
 }
 

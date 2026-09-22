@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.6-luna, fal-ai/sam2/image
 - **Started:** 2026-09-07T05:06:14Z
-- **Last updated:** 2026-09-21T20:54:00Z
+- **Last updated:** 2026-09-22T03:16:44Z
 
 ## Log
 
@@ -224,6 +224,20 @@ including the new room-list, rename and ownership cases (`convex/cleanouts.ts`,
 `src/components/PhotoCanvas.tsx`, `tests/convex/rooms.test.ts`,
 `tests/ui/rooms.test.ts`).
 
+The same commit also made "Change photo" swap the photo inside the room it is
+already in, instead of quietly starting another one — clearing that room's
+items, masks, stored photo, activity and any drafts written from the old
+picture, then re-scanning. A room holding a listing that already reached eBay
+refuses the swap rather than orphaning a real listing, and replacing a demo
+room's photo clears its demo flag, since the seeded objects are gone and the
+flag is what authorises simulated buyer offers. Work that had been running
+silently now says so: the photo carries a live "n of m items ready" count while
+masks are still arriving, each offer decision spins on the button that was
+pressed, and items still waiting on a draft show their own spinner
+(`convex/cleanouts.ts`, `src/components/Workspace.tsx`,
+`src/components/PhotoCanvas.tsx`, `src/components/OfferCard.tsx`,
+`src/components/SaleReview.tsx`).
+
 ### 2026-09-21 - 76659f6
 Replaced the dead wait after "Prepare listings" with a live preparation card.
 Every selected item gets a row that moves from Waiting to "Finding price…" to its
@@ -237,3 +251,31 @@ start overlapping workers. Verified with 134 passing tests including a new one
 that demo items are processed together and that a duplicate batch is prevented
 (`src/components/PreparationCard.tsx`, `src/components/Workspace.tsx`,
 `convex/research.ts`, `src/index.css`, `tests/convex/preparation.test.ts`).
+
+### 2026-09-21 - 64e2fdf
+Added an operator command for clearing one account's data, because the obvious
+existing helper was wrong for it: `dev.resetDemoData` predates listings and
+leaves listings, offers and agent messages behind, and it reads the caller's
+identity so it cannot be run from the CLI at all. The new internal mutation
+takes the account as an argument, walks the whole graph — items and their masks,
+the room photo, activity, listings, and each listing's offers and messages — and
+counts everything without touching it unless it is told to apply, so the damage
+reads before it happens. Rooms holding a listing that reached eBay are skipped
+by default, since deleting the row leaves a real listing live with nothing
+pointing at it. Internal-only: it takes an identity instead of deriving one, so
+it must never be reachable from a client (`convex/admin.ts`).
+
+### 2026-09-21 - b184a38
+Renamed the product to Roomly and gave it a real identity. The rename covered
+more than display text: the eBay business-policy names and the merchant location
+key prefix both carry the brand and are the keys the setup code matches on, so
+existing sellers get fresh Roomly-named policies and a new location created
+alongside the old ones on their next publish. The sign-in screen was rebuilt
+around the new logo — the content now sits on a card over a soft ambient wash
+instead of floating in an empty canvas, the brand lockup replaced a duplicated
+icon-plus-heading pair, and the page finally has a favicon, which it never had.
+Verified with 134 passing tests and a typecheck after the rename, since the
+policy names and location keys are asserted in the eBay fixtures
+(`src/components/SignIn.tsx`, `src/components/TopNav.tsx`, `index.html`,
+`convex/ebay/sellerSetup.ts`, `convex/ebay/postalCode.ts`,
+`convex/agentMail/client.ts`, `public/`).

@@ -58,6 +58,24 @@ const RETURNS: PolicySpec = {
   },
 };
 
+/**
+ * Publishing several listings at once runs one action per listing, so they all
+ * reach setup together, all find nothing, and all try to create it. Whoever
+ * loses that race gets a duplicate error naming what the winner made — the
+ * end state is what we wanted, so adopt it instead of failing the listing.
+ */
+function duplicateOf(error: unknown, needle: string): string | null {
+  if (!(error instanceof EbayError) || error.status !== 400) return null;
+  const body = error.body ?? error.message;
+  return body.includes(needle) ? body : null;
+}
+
+/** eBay returns the surviving policy's id as a `duplicatePolicyId` parameter. */
+function duplicatePolicyId(body: string): string | null {
+  const match = /"duplicatePolicyId"\s*,\s*"value"\s*:\s*"([^"]+)"/.exec(body);
+  return match?.[1] ?? null;
+}
+
 /** New sellers must opt in before they can create business policies. */
 async function optIn(env: EbayEnv, accessToken: string): Promise<void> {
   try {
@@ -90,12 +108,17 @@ async function ensureLocation(
     if (!(error instanceof EbayError) || error.status !== 404) throw error;
   }
 
-  await ebayRequest(env, accessToken, "POST", `/sell/inventory/v1/location/${key}`, {
-    location: { address: { postalCode: postalCode.trim(), country: "US" } },
-    locationTypes: ["WAREHOUSE"],
-    name: `Roomly ship-from ${key.slice(-5)}`,
-    merchantLocationStatus: "ENABLED",
-  });
+  try {
+    await ebayRequest(env, accessToken, "POST", `/sell/inventory/v1/location/${key}`, {
+      location: { address: { postalCode: postalCode.trim(), country: "US" } },
+      locationTypes: ["WAREHOUSE"],
+      name: `Roomly ship-from ${key.slice(-5)}`,
+      merchantLocationStatus: "ENABLED",
+    });
+  } catch (error) {
+    // Another publish created it between our GET and our POST.
+    if (duplicateOf(error, "merchantLocationKey already exists") === null) throw error;
+  }
   return key;
 }
 
@@ -120,12 +143,23 @@ async function findOrCreatePolicy(
     }
   }
 
-  const created = await ebayRequest(env, accessToken, "POST", spec.path, {
-    name: spec.name,
-    marketplaceId: "EBAY_US",
-    categoryTypes: CATEGORY_TYPES,
-    ...spec.body,
-  });
+  let created: Record<string, unknown>;
+  try {
+    created = await ebayRequest(env, accessToken, "POST", spec.path, {
+      name: spec.name,
+      marketplaceId: "EBAY_US",
+      categoryTypes: CATEGORY_TYPES,
+      ...spec.body,
+    });
+  } catch (error) {
+    // Another publish created it between our list and our POST. eBay names the
+    // surviving policy in the error, so take that id rather than failing.
+    const duplicate = duplicateOf(error, "Duplicate Policy");
+    const existingId = duplicate === null ? null : duplicatePolicyId(duplicate);
+    if (existingId === null) throw error;
+    return existingId;
+  }
+
   const id = created[spec.idKey];
   if (typeof id !== "string") throw new EbayError(`eBay did not return a ${spec.idKey}.`);
   return id;

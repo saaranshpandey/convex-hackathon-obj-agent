@@ -85,6 +85,60 @@ describe("ensureSellerSetup", () => {
     expect(creates).toEqual([]);
   });
 
+  /**
+   * Publishing several listings at once runs one `publishOne` action per
+   * listing, so they all reach setup together, all see nothing, and all try to
+   * create. Whoever loses the race must accept the winner's work rather than
+   * failing the listing.
+   */
+  it("accepts a location another concurrent publish created first", async () => {
+    fakeEbay({
+      ...freshSeller,
+      "POST /sell/inventory/v1/location/roomly-94105": () => ({
+        status: 400,
+        json: {
+          errors: [
+            {
+              errorId: 25803,
+              domain: "API_INVENTORY",
+              message: "merchantLocationKey already exists.",
+            },
+          ],
+        },
+      }),
+    });
+
+    const setup = await ensureSellerSetup(input);
+
+    expect(setup.locationKey).toBe("roomly-94105");
+  });
+
+  it("adopts the policy id eBay reports when another publish created it first", async () => {
+    fakeEbay({
+      ...freshSeller,
+      "POST /sell/account/v1/fulfillment_policy": () => ({
+        status: 400,
+        json: {
+          errors: [
+            {
+              errorId: 20400,
+              domain: "API_ACCOUNT",
+              message: "Invalid request.",
+              longMessage: "Duplicate Policy",
+              parameters: [{ name: "duplicatePolicyId", value: "334172182021" }],
+            },
+          ],
+        },
+      }),
+    });
+
+    const setup = await ensureSellerSetup(input);
+
+    // eBay hands back the id of the policy that already exists; use it.
+    expect(setup.fulfillmentPolicyId).toBe("334172182021");
+    expect(setup.paymentPolicyId).toBe("P1");
+  });
+
   it("treats a 404 policy list as empty and creates the policy", async () => {
     fakeEbay({
       ...freshSeller,
