@@ -2,7 +2,7 @@
 
 - **Project:** Roomsale
 - **Event:** Convex All Gas Hackathon
-- **What it does:** Upload one photo of a room, get each sellable object segmented and selectable inside the photo, and choose what to put up for sale.
+- **What it does:** Upload one photo of a room, get each sellable object segmented and selectable inside the photo, then price each item, draft eBay listings, publish them to your own eBay account, and handle buyer offers by email.
 - **Live app:** https://adjoining-gerbil-124.convex.site
 - **Repo:** https://github.com/saaranshpandey/convex-hackathon-obj-agent
 - **Frontend:** Convex static hosting
@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** gpt-5.6-luna, fal-ai/sam2/image
 - **Started:** 2026-09-07T05:06:14Z
-- **Last updated:** 2026-09-21T00:31:25Z
+- **Last updated:** 2026-09-21T20:54:00Z
 
 ## Log
 
@@ -207,7 +207,7 @@ actions, actions, internal functions, environment variables
 `convex/http.ts`, `tests/convex/ebayNotifications.test.ts`,
 `tests/ebay/publisher.test.ts`).
 
-### 2026-09-21 - working tree
+### 2026-09-21 - 012f8a8
 Rooms became threads. Every room the signed-in user owns is listed in a rail
 alongside the workspace — the way a conversation list works — so an earlier room
 stays reachable instead of being replaced by the newest one; opening one loads
@@ -223,3 +223,17 @@ including the new room-list, rename and ownership cases (`convex/cleanouts.ts`,
 `src/components/RoomRail.tsx`, `src/lib/rooms.ts`, `src/App.tsx`,
 `src/components/PhotoCanvas.tsx`, `tests/convex/rooms.test.ts`,
 `tests/ui/rooms.test.ts`).
+
+### 2026-09-21 - 76659f6
+Replaced the dead wait after "Prepare listings" with a live preparation card.
+Every selected item gets a row that moves from Waiting to "Finding price…" to its
+price range with a check as its research finishes, under a progress ring that
+fills as items complete. The reveal is paced a beat apart so results read one at
+a time while the research itself still runs in parallel, up to four items at
+once, and the card holds briefly before handing over to review; reduced-motion
+users skip the pacing. Starting research is now ignored on the server while a
+room's research is already in flight, so a repeated click or a second tab cannot
+start overlapping workers. Verified with 134 passing tests including a new one
+that demo items are processed together and that a duplicate batch is prevented
+(`src/components/PreparationCard.tsx`, `src/components/Workspace.tsx`,
+`convex/research.ts`, `src/index.css`, `tests/convex/preparation.test.ts`).
