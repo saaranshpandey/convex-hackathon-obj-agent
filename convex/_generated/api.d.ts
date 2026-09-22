@@ -10,6 +10,7 @@
 
 import type * as access from "../access.js";
 import type * as activity from "../activity.js";
+import type * as admin from "../admin.js";
 import type * as agentMail from "../agentMail.js";
 import type * as agentMail_client from "../agentMail/client.js";
 import type * as agentMail_messages from "../agentMail/messages.js";
@@ -72,6 +73,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   access: typeof access;
   activity: typeof activity;
+  admin: typeof admin;
   agentMail: typeof agentMail;
   "agentMail/client": typeof agentMail_client;
   "agentMail/messages": typeof agentMail_messages;

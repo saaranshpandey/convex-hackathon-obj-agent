@@ -9,3 +9,5 @@ dist-ssr
 keys.txt
 
 .auth-keys*.json
+
+brag-output
